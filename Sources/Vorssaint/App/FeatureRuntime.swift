@@ -399,6 +399,7 @@ final class FeatureRuntime: ObservableObject {
         .monitorNetwork: { FeatureRuntime.syncMonitor() },
         .monitorDisk: { FeatureRuntime.syncMonitor() },
         .monitorPower: { FeatureRuntime.syncMonitor() },
+        .securityScan: { SecurityScanService.shared.syncWithPreferences() },
         .fanControl: {
             SystemMonitor.shared.planDidChange()
             let defaults = UserDefaults.standard

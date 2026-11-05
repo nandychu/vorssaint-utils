@@ -141,6 +141,7 @@ struct MetricsTests {
                 QuickTogglesQuitAllTests.run(suite)
                 QuitAppsRuntimeTests.run(suite)
                 PortManagerRefreshTests.run(suite)
+                SecurityScanTests.run(suite)
             }),
             ("settings", {
                 SettingsFeatureTests.run(suite)
