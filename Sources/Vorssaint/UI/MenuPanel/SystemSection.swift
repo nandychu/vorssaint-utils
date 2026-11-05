@@ -40,6 +40,7 @@ struct SystemSection: View {
     @AppStorage(DefaultsKey.monitorGraphMemory) private var graphMemory = true
     @AppStorage(DefaultsKey.temperatureUnit) private var temperatureUnit = TemperatureUnit.celsius.rawValue
     @AppStorage(DefaultsKey.monitorSysTemps) private var sysTemps = true
+    @AppStorage(DefaultsKey.monitorSysFanSpeed) private var sysFanSpeed = true
     @AppStorage(DefaultsKey.monitorSysCPU) private var sysCPU = true
     @AppStorage(DefaultsKey.monitorSysCPUCores) private var sysCPUCores = true
     @AppStorage(DefaultsKey.monitorSysGPU) private var sysGPU = true
@@ -91,7 +92,9 @@ struct SystemSection: View {
 
     /// Card subsections, in order, filtered by the per-item toggles (and whether a
     /// battery exists). Drives divider interleaving so only rendered blocks get one.
-    private enum Block: String, PanelOrderItem { case temps, usage, memory, alerts, uptime, connectedDevices }
+    private enum Block: String, PanelOrderItem {
+        case temps, fanSpeed, usage, memory, alerts, uptime, connectedDevices
+    }
 
     // Hub availability per metric family: an unavailable metric leaves the
     // card entirely, including the edit-mode hidden rows.
@@ -114,6 +117,7 @@ struct SystemSection: View {
     private func isBlockAvailable(_ block: Block) -> Bool {
         switch block {
         case .temps, .usage: return cpuAvailable || gpuAvailable
+        case .fanSpeed: return SystemMonitor.fanTelemetryAvailable
         case .memory: return memoryAvailable
         case .connectedDevices: return AppFeature.connectedDevices.isAvailable
         case .alerts, .uptime: return true
@@ -138,6 +142,7 @@ struct SystemSection: View {
     private func isVisible(_ block: Block) -> Bool {
         switch block {
         case .temps: return sysTemps
+        case .fanSpeed: return sysFanSpeed
         case .usage: return usageVisible
         case .memory: return sysMemory
         case .alerts: return sysAlerts
@@ -150,6 +155,7 @@ struct SystemSection: View {
         PanelLayout.resetItemOrder(key: DefaultsKey.panelSystemOrder)
         systemOrderRaw = ""
         sysTemps = true
+        sysFanSpeed = true
         sysCPU = true
         sysCPUCores = true
         sysGPU = true
@@ -163,6 +169,7 @@ struct SystemSection: View {
     private func blockContent(_ block: Block, editing: Bool) -> some View {
         switch block {
         case .temps: temperatureGrid(editing: editing)
+        case .fanSpeed: fanSpeedRows(editing: editing)
         case .usage: usageRows(editing: editing)
         case .memory: memoryRows(editing: editing)
         case .alerts: alertRows(editing: editing)
@@ -358,6 +365,43 @@ struct SystemSection: View {
 
     private var displayTemperatureUnit: TemperatureUnit {
         TemperatureUnit(rawValue: temperatureUnit) ?? .celsius
+    }
+
+    @ViewBuilder
+    private func fanSpeedRows(editing: Bool) -> some View {
+        let strings = FeatureStrings.fanControl(l10n.language)
+        if !sysFanSpeed {
+            PanelHiddenItemRow(title: strings.menuBarTitle, systemImage: MenuBarMetric.fanSpeed.symbolName,
+                               isVisible: $sysFanSpeed)
+        } else {
+            let speeds = monitor.snapshot.fanSpeeds
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    subsectionLabel(strings.menuBarTitle)
+                    Spacer(minLength: 0)
+                    if editing {
+                        PanelInlineHideButton(isVisible: $sysFanSpeed)
+                    }
+                }
+                if speeds.isEmpty {
+                    Text(l10n.s.monitorUnavailable)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+                ForEach(speeds.indices, id: \.self) { index in
+                    HStack(spacing: 6) {
+                        Label(String(format: strings.fanNameFormat, index + 1),
+                              systemImage: MenuBarMetric.fanSpeed.symbolName)
+                        Spacer(minLength: 0)
+                        Text(String(format: strings.rpmFormat, Int(speeds[index].rounded())))
+                            .fontWeight(.semibold)
+                            .monospacedDigit()
+                    }
+                    .font(.system(size: 11))
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
     }
 
     // MARK: Hardware usage

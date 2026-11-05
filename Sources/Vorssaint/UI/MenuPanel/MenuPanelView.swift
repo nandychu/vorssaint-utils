@@ -74,6 +74,7 @@ struct MenuPanelView: View {
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(DefaultsKey.monitorShowMixer) private var showMixer = true
     @AppStorage(DefaultsKey.monitorShowSystem) private var showSystem = true
+    @AppStorage(DefaultsKey.monitorSysFanSpeed) private var showSystemFanSpeed = true
     @AppStorage(DefaultsKey.monitorShowNetwork) private var showNetwork = true
     @AppStorage(DefaultsKey.monitorShowDisk) private var showDisk = true
     @AppStorage(DefaultsKey.monitorShowPower) private var showPower = true
@@ -150,7 +151,7 @@ struct MenuPanelView: View {
             return selectedMetric.monitorNeeds
         }
         switch activeSection {
-        case .system: return SystemMonitorPanelNeeds(system: true)
+        case .system: return SystemMonitorPanelNeeds(system: true, fanSpeed: showSystemFanSpeed)
         case .network: return SystemMonitorPanelNeeds(network: true)
         case .disk: return SystemMonitorPanelNeeds(disk: true)
         case .power: return SystemMonitorPanelNeeds(power: true, powerCard: true)

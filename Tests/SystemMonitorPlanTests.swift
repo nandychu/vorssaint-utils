@@ -23,6 +23,7 @@ enum SystemMonitorPlanTests {
     class PanelFixture {
         var selectedMetric: MetricDetailKind?
         var activeSection = PanelSectionID.keepAwake
+        var showSystemFanSpeed = true
     }
 
     static func run(_ suite: TestSuite) {
@@ -85,6 +86,28 @@ enum SystemMonitorPlanTests {
                      "an uninstalled CPU monitor does not read every core")
 
         let panel = Panel()
+        panel.activeSection = .system
+        defaults.set(false, forKey: AppFeature.fanControl.availabilityKey)
+        defaults.set(true, forKey: DefaultsKey.menuBarFanSpeed)
+        monitor.menuPanelNeeds = panel.monitorNeeds
+        let systemFans = monitor.currentPlan(defaults: defaults)
+        suite.expect(systemFans.needFanSpeed && !systemFans.needFanSpeedMenuBar,
+                     "the System panel reads fan RPMs without fan control or a menu bar metric")
+        panel.showSystemFanSpeed = false
+        monitor.menuPanelNeeds = panel.monitorNeeds
+        suite.expect(!monitor.currentPlan(defaults: defaults).needFanSpeed,
+                     "hiding the System fan block stops its RPM reads")
+        defaults.set(true, forKey: AppFeature.fanControl.availabilityKey)
+        let pinnedFans = monitor.currentPlan(defaults: defaults)
+        suite.expect(pinnedFans.needFanSpeed && pinnedFans.needFanSpeedMenuBar,
+                     "the existing menu bar fan metric still reads RPMs with the System fan block hidden")
+        defaults.set(false, forKey: DefaultsKey.menuBarFanSpeed)
+        panel.selectedMetric = .fan
+        monitor.menuPanelNeeds = panel.monitorNeeds
+        suite.expect(monitor.currentPlan(defaults: defaults).needFanSpeed,
+                     "the existing fan detail still reads RPMs with the System fan block hidden")
+        panel.selectedMetric = nil
+
         panel.activeSection = .power
         monitor.menuPanelNeeds = panel.monitorNeeds
         defaults.set(true, forKey: AppFeature.monitorPower.availabilityKey)

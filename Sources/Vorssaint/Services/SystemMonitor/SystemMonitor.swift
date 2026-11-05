@@ -598,11 +598,13 @@ final class SystemMonitor: ObservableObject {
             (panelNeedsPower && defaults.bool(forKey: DefaultsKey.monitorPwrTemperature))
                 || menuPanelNeeds.batteryTemperature
                 || defaults.bool(forKey: DefaultsKey.menuBarBatteryTemperature) || alertBatteryTemperature)
-        if defaults.bool(forKey: AppFeature.fanControl.availabilityKey),
-           Self.fanTelemetryAvailable {
-            plan.needFanSpeed = fullMonitorVisible || menuPanelNeeds.fanSpeed
-                || defaults.bool(forKey: DefaultsKey.menuBarFanSpeed)
-            plan.needFanSpeedMenuBar = defaults.bool(forKey: DefaultsKey.menuBarFanSpeed)
+        // The System panel's read-only RPMs are independent of fan control.
+        let systemFans = self.menuPanelNeeds.system && self.menuPanelNeeds.fanSpeed
+        let fanControlAvailable = AppFeature.fanControl.isAvailable(in: defaults)
+        if systemFans || fanControlAvailable, Self.fanTelemetryAvailable {
+            plan.needFanSpeedMenuBar = fanControlAvailable && defaults.bool(forKey: DefaultsKey.menuBarFanSpeed)
+            plan.needFanSpeed = systemFans || plan.needFanSpeedMenuBar
+                || (fanControlAvailable && (fullMonitorVisible || menuPanelNeeds.fanSpeed))
         }
         // The island preview in Settings shows the device card too; the
         // panel's System card reads USB only for its device row's count.
@@ -639,10 +641,6 @@ final class SystemMonitor: ObservableObject {
             plan.needPowerDraw = false
             plan.needPeripheralBattery = false
             plan.needBatteryTemperature = false
-        }
-        if !available(.fanControl) {
-            plan.needFanSpeed = false
-            plan.needFanSpeedMenuBar = false
         }
         if !available(.connectedDevices) { plan.needConnectedDevices = false }
         return plan

@@ -17,6 +17,7 @@ struct MonitorPanelConfig: View {
 
     @AppStorage(DefaultsKey.monitorShowSystem) private var showSystem = true
     @AppStorage(DefaultsKey.monitorSysTemps) private var sysTemps = true
+    @AppStorage(DefaultsKey.monitorSysFanSpeed) private var sysFanSpeed = true
     @AppStorage(DefaultsKey.monitorSysCPU) private var sysCPU = true
     @AppStorage(DefaultsKey.monitorSysCPUCores) private var sysCPUCores = true
     @AppStorage(DefaultsKey.monitorSysGPU) private var sysGPU = true
@@ -121,6 +122,11 @@ struct MonitorPanelConfig: View {
             if AppFeature.monitorCPU.isAvailable || AppFeature.monitorGPU.isAvailable {
                 itemTile(l10n.s.temperatures, symbol: "thermometer.medium", value: $sysTemps, available: available)
             }
+            if SystemMonitor.fanTelemetryAvailable {
+                itemTile(FeatureStrings.fanControl(l10n.language).menuBarTitle,
+                         symbol: MenuBarMetric.fanSpeed.symbolName,
+                         value: $sysFanSpeed, available: available)
+            }
             if AppFeature.monitorCPU.isAvailable {
                 itemTile(l10n.s.cpuLabel, symbol: MenuBarMetric.cpu.symbolName, value: $sysCPU, available: available,
                          options: AnyView(VStack(spacing: 10) {
@@ -208,6 +214,9 @@ struct MonitorPanelConfig: View {
             block(.system, title: l10n.s.systemSection, master: $showSystem) {
                 if AppFeature.monitorCPU.isAvailable || AppFeature.monitorGPU.isAvailable {
                     Toggle(l10n.s.temperatures, isOn: $sysTemps)
+                }
+                if SystemMonitor.fanTelemetryAvailable {
+                    Toggle(FeatureStrings.fanControl(l10n.language).menuBarTitle, isOn: $sysFanSpeed)
                 }
                 if AppFeature.monitorCPU.isAvailable {
                     Toggle(l10n.s.cpuLabel, isOn: $sysCPU)
