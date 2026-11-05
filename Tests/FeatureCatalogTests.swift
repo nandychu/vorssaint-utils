@@ -1349,6 +1349,11 @@ enum FeatureCatalogTests {
                 && FanControlPolicy.menuBarValue(for: []) == nil
                 && FanControlPolicy.menuBarValue(for: [.infinity]) == nil,
                "fan RPM menu bar text supports one or several validated fans")
+        suite.expect(FanControlPolicy.menuBarValue(for: [1_199.8, 1_200.6], average: true) == "1200"
+                && FanControlPolicy.menuBarValue(for: [0, 1_301], average: true) == "651"
+                && FanControlPolicy.menuBarValue(for: [], average: true) == nil
+                && FanControlPolicy.menuBarValue(for: [1_200, .infinity], average: true) == nil,
+               "average RPM rounds after averaging and includes stopped fans")
         suite.expect(FanControlPolicy.menuBarWidthUnits(fanCount: 1) == 12
                 && FanControlPolicy.menuBarWidthUnits(fanCount: 2) == 18
                 && FanControlPolicy.menuBarWidthUnits(fanCount: 0) == 0,

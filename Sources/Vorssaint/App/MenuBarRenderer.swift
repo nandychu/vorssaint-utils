@@ -337,6 +337,10 @@ enum MenuBarRenderer {
         return columns > 0 ? columns + statusTextGapColumns : 0
     }
 
+    private static var averagesFanSpeeds: Bool {
+        UserDefaults.standard.bool(forKey: DefaultsKey.menuBarAverageFanSpeed)
+    }
+
     private static func blockSegments(for snapshot: SystemSnapshot,
                                       metrics: [MenuBarMetric],
                                       style: MenuBarBlockStyle) -> [MenuBarSegment] {
@@ -588,8 +592,10 @@ enum MenuBarRenderer {
                                                 pressure: nil)])
                 }
             case .fanSpeed:
-                if let value = FanControlPolicy.menuBarValue(for: snapshot.fanSpeeds) {
-                    let minimumValue = Array(repeating: "20000", count: snapshot.fanSpeeds.count)
+                let average = averagesFanSpeeds
+                if let value = FanControlPolicy.menuBarValue(for: snapshot.fanSpeeds, average: average) {
+                    let readingCount = average ? 1 : snapshot.fanSpeeds.count
+                    let minimumValue = Array(repeating: "20000", count: readingCount)
                         .joined(separator: "/")
                     groups.append([.metricBlock(label: "RPM",
                                                 value: value,
@@ -677,7 +683,7 @@ enum MenuBarRenderer {
         case (_, .connectedDevices):
             return 6       // symbol + " 99"
         case (_, .fanSpeed):
-            let count = max(1, SystemMonitor.fanTelemetryCount)
+            let count = averagesFanSpeeds ? 1 : max(1, SystemMonitor.fanTelemetryCount)
             return FanControlPolicy.menuBarWidthUnits(fanCount: count)
         }
     }

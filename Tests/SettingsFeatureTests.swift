@@ -427,6 +427,7 @@ enum SettingsFeatureTests {
                 && backupKeys.contains(DefaultsKey.fanControlCoolingLevel)
                 && backupKeys.contains(DefaultsKey.fanControlCurves)
                 && backupKeys.contains(DefaultsKey.menuBarFanSpeed)
+                && backupKeys.contains(DefaultsKey.menuBarAverageFanSpeed)
                 && backupKeys.contains(DefaultsKey.fanControlResume)
                 && !backupKeys.contains(DefaultsKey.fanControlRecoveryNeeded)
                 && !backupKeys.contains(DefaultsKey.fanControlHelperVersion)

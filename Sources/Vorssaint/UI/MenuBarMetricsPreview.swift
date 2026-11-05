@@ -23,6 +23,7 @@ struct MenuBarMetricsPreview: View {
     @AppStorage(DefaultsKey.menuBarPeripheralBattery) private var peripheralBattery = false
     @AppStorage(DefaultsKey.menuBarPower) private var power = false
     @AppStorage(DefaultsKey.menuBarFanSpeed) private var fanSpeed = false
+    @AppStorage(DefaultsKey.menuBarAverageFanSpeed) private var averageFanSpeed = false
     @AppStorage(DefaultsKey.menuBarConnectedDevices) private var connectedDevices = false
     @AppStorage(DefaultsKey.menuBarMetricOrder) private var metricOrder = ""
     @AppStorage(DefaultsKey.menuBarCombineTemperatures) private var combineTemperatures = true
@@ -53,6 +54,7 @@ struct MenuBarMetricsPreview: View {
         let _ = usageBarHighThreshold
         let _ = labelStyle
         let _ = networkUploadFirst
+        let _ = averageFanSpeed
         let _ = memoryStyle
         let _ = diskStyle
         let _ = temperatureUnit

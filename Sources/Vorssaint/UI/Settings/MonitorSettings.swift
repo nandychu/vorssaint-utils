@@ -393,6 +393,7 @@ private struct MenuBarMetricTile: View {
     @AppStorage private var shown: Bool
     @AppStorage(DefaultsKey.menuBarMemoryStyle) private var memoryStyle = "percent"
     @AppStorage(DefaultsKey.menuBarNetworkUploadFirst) private var uploadFirst = false
+    @AppStorage(DefaultsKey.menuBarAverageFanSpeed) private var averageFanSpeed = false
     @AppStorage(DiskMenuBarStyle.defaultsKey) private var diskStyle = DiskMenuBarStyle.percent
 
     init(metric: MenuBarMetric) {
@@ -405,6 +406,10 @@ private struct MenuBarMetricTile: View {
                      options: options, optionsSummary: optionsSummary)
     }
 
+    private var averageRPMTitle: String {
+        FeatureStrings.fanControl(l10n.language).menuBarAverageRPM
+    }
+
     /// What the reading's option makes the menu bar show, in its own terms.
     private var optionsSummary: String {
         switch metric {
@@ -412,6 +417,8 @@ private struct MenuBarMetricTile: View {
             return Defaults.sanitizedMenuBarMemoryStyle(memoryStyle) != "percent"
                 ? l10n.s.monitorMemoryPressureDot : FeatureStrings.mouseClickDebounce(l10n.language).moreOptions
         case .network: return uploadFirst ? "↑ ↓" : "↓ ↑"
+        case .fanSpeed:
+            return averageFanSpeed ? averageRPMTitle : FeatureStrings.mouseClickDebounce(l10n.language).moreOptions
         case .diskUsage:
             switch diskStyle {
             case DiskMenuBarStyle.free: return l10n.s.diskMenuBarAvailableSpace
@@ -435,6 +442,8 @@ private struct MenuBarMetricTile: View {
             return AnyView(MonitorTokenOption(symbol: "arrow.up.arrow.down",
                                                  title: l10n.s.monitorNetworkUploadFirst,
                                                  isOn: $uploadFirst))
+        case .fanSpeed where SystemMonitor.fanTelemetryCount > 1:
+            return AnyView(MonitorTokenOption(symbol: "divide", title: averageRPMTitle, isOn: $averageFanSpeed))
         case .diskUsage:
             return AnyView(Picker(l10n.s.diskMenuBarStyleLabel, selection: $diskStyle) {
                 Text(l10n.s.diskMenuBarUsedPercentage).tag(DiskMenuBarStyle.percent)

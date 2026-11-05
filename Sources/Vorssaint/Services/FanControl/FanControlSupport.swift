@@ -389,8 +389,12 @@ enum FanControlPolicy {
         return values
     }
 
-    static func menuBarValue(for speeds: [Double]) -> String? {
+    static func menuBarValue(for speeds: [Double], average: Bool = false) -> String? {
         guard !speeds.isEmpty, speeds.allSatisfy(validReading) else { return nil }
+        if average {
+            let mean = speeds.reduce(0, +) / Double(speeds.count)
+            return String(Int(mean.rounded()))
+        }
         return speeds.map { String(Int($0.rounded())) }.joined(separator: "/")
     }
 
