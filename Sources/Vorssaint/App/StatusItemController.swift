@@ -127,7 +127,7 @@ final class StatusItemController {
         statusItem.behavior = []
         statusItem.isVisible = true
         if let button = statusItem.button {
-            button.image = BlackHoleGlyph.image(active: false)
+            button.image = BlackHoleGlyph.statusItemImage(active: false)
             button.font = MenuBarRenderer.statusFont(stacked: false)
             button.alignment = .left
             button.cell?.lineBreakMode = .byClipping
@@ -344,8 +344,8 @@ final class StatusItemController {
         refresh()
     }
 
-    /// Reflects keep-awake state and an available update in the icon. Updates
-    /// keep the blue attention glyph; an active session uses the chosen icon.
+    /// Reflects keep-awake state and an available update in the icon. The
+    /// official app uses blue for updates. An active session uses the chosen icon.
     /// With the mute indicator option on, a red slashed mic joins the glyph
     /// while the microphone is muted, whatever the underlying state. The
     /// glyph can also hide entirely while metrics render in the title (user
@@ -404,12 +404,8 @@ final class StatusItemController {
             button.image = Self.emptyStatusImage
             return
         }
-        let stateImage: NSImage?
-        if updateAvailable {
-            stateImage = BlackHoleGlyph.attentionImage()
-        } else {
-            stateImage = BlackHoleGlyph.image(active: keepAwakeActive)
-        }
+        let stateImage = BlackHoleGlyph.statusItemImage(
+            active: keepAwakeActive, updateAvailable: updateAvailable)
         if micBadgeActive {
             button.image = BlackHoleGlyph.micMutedImage(over: stateImage) ?? stateImage
         } else {
@@ -935,6 +931,12 @@ enum BlackHoleGlyph {
         let tint = KeepAwakeIconTint.current
         guard active else { return mark() ?? fallback(active: false) }
         return activeImage(style: .current, tint: tint)
+    }
+
+    static func statusItemImage(active: Bool, updateAvailable: Bool = false) -> NSImage? {
+        let glyph = updateAvailable ? attentionImage() : image(active: active)
+        guard AppInfo.isDeveloperBuild, let glyph else { return glyph }
+        return tintedImage(glyph, color: .systemRed) ?? glyph
     }
 
     static func activeImage(style: KeepAwakeActiveIcon,
