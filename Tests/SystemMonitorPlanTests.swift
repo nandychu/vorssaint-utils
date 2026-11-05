@@ -88,7 +88,6 @@ enum SystemMonitorPlanTests {
         let panel = Panel()
         panel.activeSection = .system
         defaults.set(false, forKey: AppFeature.fanControl.availabilityKey)
-        defaults.set(true, forKey: DefaultsKey.menuBarFanSpeed)
         monitor.menuPanelNeeds = panel.monitorNeeds
         let systemFans = monitor.currentPlan(defaults: defaults)
         suite.expect(systemFans.needFanSpeed && !systemFans.needFanSpeedMenuBar,
@@ -97,15 +96,16 @@ enum SystemMonitorPlanTests {
         monitor.menuPanelNeeds = panel.monitorNeeds
         suite.expect(!monitor.currentPlan(defaults: defaults).needFanSpeed,
                      "hiding the System fan block stops its RPM reads")
-        defaults.set(true, forKey: AppFeature.fanControl.availabilityKey)
+        defaults.set(true, forKey: DefaultsKey.menuBarFanSpeed)
+        monitor.menuPanelNeeds = .none
         let pinnedFans = monitor.currentPlan(defaults: defaults)
         suite.expect(pinnedFans.needFanSpeed && pinnedFans.needFanSpeedMenuBar,
-                     "the existing menu bar fan metric still reads RPMs with the System fan block hidden")
+                     "the menu bar reads fan RPMs with the System panel closed and fan control off")
         defaults.set(false, forKey: DefaultsKey.menuBarFanSpeed)
         panel.selectedMetric = .fan
         monitor.menuPanelNeeds = panel.monitorNeeds
         suite.expect(monitor.currentPlan(defaults: defaults).needFanSpeed,
-                     "the existing fan detail still reads RPMs with the System fan block hidden")
+                     "the fan detail reads RPMs with the menu bar metric and fan control off")
         panel.selectedMetric = nil
 
         panel.activeSection = .power

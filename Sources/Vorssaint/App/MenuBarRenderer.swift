@@ -87,9 +87,7 @@ enum MenuBarMetric: String, CaseIterable, Identifiable {
         defaults.set(raw, forKey: DefaultsKey.menuBarMetricOrder)
     }
 
-    /// The hub feature this metric belongs to; temperatures ride with their
-    /// parent metric. A pinned metric whose feature is off in the hub stays
-    /// pinned in defaults but stops rendering (and sampling) until it returns.
+    /// The associated hub feature. Temperatures ride with their parent metric.
     var feature: AppFeature {
         switch self {
         case .cpu, .cpuTemperature: return .monitorCPU
@@ -103,7 +101,7 @@ enum MenuBarMetric: String, CaseIterable, Identifiable {
         }
     }
 
-    var isAvailableOnCurrentHardware: Bool {
+    private var isAvailableOnCurrentHardware: Bool {
         switch self {
         case .battery, .batteryTime, .batteryTemperature:
             return PowerSampler.hasInternalBattery
@@ -114,19 +112,20 @@ enum MenuBarMetric: String, CaseIterable, Identifiable {
         }
     }
 
+    func isAvailable(in defaults: UserDefaults = .standard) -> Bool {
+        // Read-only RPMs can be pinned without installing Fan Control.
+        (self == .fanSpeed || feature.isAvailable(in: defaults)) && isAvailableOnCurrentHardware
+    }
+
     static func enabled(in defaults: UserDefaults) -> [MenuBarMetric] {
         order(in: defaults).filter {
-            defaults.bool(forKey: $0.defaultsKey)
-                && defaults.bool(forKey: $0.feature.availabilityKey)
-                && $0.isAvailableOnCurrentHardware
+            defaults.bool(forKey: $0.defaultsKey) && $0.isAvailable(in: defaults)
         }
     }
 
     static func anyEnabled(in defaults: UserDefaults) -> Bool {
         allCases.contains {
-            defaults.bool(forKey: $0.defaultsKey)
-                && defaults.bool(forKey: $0.feature.availabilityKey)
-                && $0.isAvailableOnCurrentHardware
+            defaults.bool(forKey: $0.defaultsKey) && $0.isAvailable(in: defaults)
         }
     }
 }

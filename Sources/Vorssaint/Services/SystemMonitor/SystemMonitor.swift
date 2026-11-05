@@ -598,13 +598,11 @@ final class SystemMonitor: ObservableObject {
             (panelNeedsPower && defaults.bool(forKey: DefaultsKey.monitorPwrTemperature))
                 || menuPanelNeeds.batteryTemperature
                 || defaults.bool(forKey: DefaultsKey.menuBarBatteryTemperature) || alertBatteryTemperature)
-        // The System panel's read-only RPMs are independent of fan control.
-        let systemFans = self.menuPanelNeeds.system && self.menuPanelNeeds.fanSpeed
-        let fanControlAvailable = AppFeature.fanControl.isAvailable(in: defaults)
-        if systemFans || fanControlAvailable, Self.fanTelemetryAvailable {
-            plan.needFanSpeedMenuBar = fanControlAvailable && defaults.bool(forKey: DefaultsKey.menuBarFanSpeed)
-            plan.needFanSpeed = systemFans || plan.needFanSpeedMenuBar
-                || (fanControlAvailable && (fullMonitorVisible || menuPanelNeeds.fanSpeed))
+        let menuBarFans = defaults.bool(forKey: DefaultsKey.menuBarFanSpeed)
+        let previewFans = fullMonitorVisible && AppFeature.fanControl.isAvailable(in: defaults)
+        if menuBarFans || menuPanelNeeds.fanSpeed || previewFans, Self.fanTelemetryAvailable {
+            plan.needFanSpeed = true
+            plan.needFanSpeedMenuBar = menuBarFans
         }
         // The island preview in Settings shows the device card too; the
         // panel's System card reads USB only for its device row's count.

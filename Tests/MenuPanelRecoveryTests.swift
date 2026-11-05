@@ -148,7 +148,10 @@ enum MenuPanelRecoveryTests {
         func setMicBadgeHeld(_ value: Bool) { held = value }
     }
     typealias MetricDetailKind = String
-    struct MenuBarMetric { let detailKind: String }
+    struct MenuBarMetric {
+        let detailKind: String
+        var feature: AppFeature { .monitorCPU }
+    }
     enum Module { case system }
     enum NotchSupport {
         static func routesAppPanel() -> Bool { false }
