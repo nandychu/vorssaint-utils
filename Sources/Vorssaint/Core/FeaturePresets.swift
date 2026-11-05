@@ -133,7 +133,7 @@ extension AppFeature {
              .monitorCPU, .monitorGPU, .monitorMemory,
              .monitorNetwork, .monitorDisk, .monitorPower, .connectedDevices:
             return .periodic
-        case .mixer:
+        case .mixer, .audioEqualizer:
             return UserDefaults.standard.bool(forKey: DefaultsKey.preciseVolumeRollerEnabled)
                 ? .keyboard : .idle
         case .brightness:
@@ -150,7 +150,7 @@ extension AppFeature {
              .bluetoothSleep, .keepAwake, .quickLauncher, .quickToggles, .quitApps, .colorPicker,
              .screenOCR, .cleaningMode, .mediaTools, .cleaner, .uninstaller, .homebrew, .screenshot,
              .cameraPreview, .scratchpad, .commandBar, .screenRecorder, .wallpaper, .fanControl,
-             .diskImageInstaller, .killProcess, .portManager, .securityScan:
+             .diskImageInstaller, .killProcess, .portManager, .securityScan, .cpuStress:
             return .idle
         case .appUpdates:
             // The list is on demand; only a background schedule keeps a timer.

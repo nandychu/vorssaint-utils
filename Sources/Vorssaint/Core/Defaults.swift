@@ -155,6 +155,8 @@ enum DefaultsKey {
     static let appOutputDevices = "appOutputDevices"      // [bundle id: audio device UID]
     static let mixerCallAppVolumeEnabled = "mixerCallAppVolumeEnabled" // bundle ids explicitly allowed to process call audio despite screen-sharing echo
     static let mixerUniversalOutputDevice = "mixerUniversalOutputDevice" // retired: all-apps output saved by 3.4.1 betas
+    static let audioEqualizerEnabled = "audioEqualizerEnabled"
+    static let audioEqualizerProfiles = "audioEqualizerProfiles"
     static let mixerShowFinder = "mixerShowFinder"
     static let mixerAppArrangement = "mixerAppArrangement"
     static let mixerHideInactiveApps = "mixerHideInactiveApps"
@@ -405,6 +407,12 @@ enum DefaultsKey {
     static let menuBarPower = "menuBarPower"
     static let menuBarFanSpeed = "menuBarFanSpeed"
     static let menuBarAverageFanSpeed = "menuBarAverageFanSpeed"
+    static let menuBarCPUTemperatureColors = "menuBarCPUTemperatureColors"
+    static let menuBarCPUTemperatureYellow = "menuBarCPUTemperatureYellow" // Celsius
+    static let menuBarCPUTemperatureRed = "menuBarCPUTemperatureRed" // Celsius
+    static let menuBarFanSpeedColors = "menuBarFanSpeedColors"
+    static let menuBarFanSpeedYellow = "menuBarFanSpeedYellow" // RPM
+    static let menuBarFanSpeedRed = "menuBarFanSpeedRed" // RPM
     static let menuBarPreset = "menuBarPreset"           // dense
     static let menuBarMetricSpacing = "menuBarMetricSpacing" // standard | compact
     static let menuBarMetricAppearance = "menuBarMetricAppearance" // values | bars
@@ -1323,6 +1331,8 @@ enum Defaults {
         DefaultsKey.showReleaseNotesBeforeUpdate: true,
         DefaultsKey.updateShowcaseIntroVersion: "",
         DefaultsKey.updateShowcaseMediaOverride: "",
+        DefaultsKey.audioEqualizerEnabled: false,
+        DefaultsKey.audioEqualizerProfiles: "",
         DefaultsKey.mixerShowFinder: true,
         DefaultsKey.mixerHideInactiveApps: false,
         DefaultsKey.mixerAppArrangement: "",
@@ -1667,6 +1677,12 @@ enum Defaults {
         DefaultsKey.menuBarConnectedDevices: false,
         DefaultsKey.menuBarFanSpeed: false,
         DefaultsKey.menuBarAverageFanSpeed: false,
+        DefaultsKey.menuBarCPUTemperatureColors: false,
+        DefaultsKey.menuBarCPUTemperatureYellow: MenuBarThresholdMetric.cpuTemperature.defaultYellow,
+        DefaultsKey.menuBarCPUTemperatureRed: MenuBarThresholdMetric.cpuTemperature.defaultRed,
+        DefaultsKey.menuBarFanSpeedColors: false,
+        DefaultsKey.menuBarFanSpeedYellow: MenuBarThresholdMetric.fanSpeed.defaultYellow,
+        DefaultsKey.menuBarFanSpeedRed: MenuBarThresholdMetric.fanSpeed.defaultRed,
         DefaultsKey.menuBarPreset: "dense",
         DefaultsKey.menuBarMetricSpacing: "compact",  // owner's call: compact by default in 3.1.8
         DefaultsKey.menuBarMetricAppearance: "values",

@@ -593,6 +593,8 @@ struct SettingsView: View {
         case .killProcess: KillProcessView()
         case .portManager: PortManagerView()
         case .securityScan: SecurityScanView()
+        case .cpuStress: CPUStressView()
+        case .audioEqualizer: AudioEqualizerSettingsView()
         case .urlCleaner: URLCleanerSettings()
         case .cleaner: CleanerSettings()
         case .homebrew: HomebrewSettings()

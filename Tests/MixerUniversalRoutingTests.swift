@@ -81,6 +81,18 @@ enum MixerUniversalRoutingContract {
         }
         func applyRouting(for app: MixerApp) { applied.append(app) }
         func chooseAirPlaySpeaker(for app: MixerApp) {}
+        var equalizer: AudioEqualizerProfile?
+        func equalizerProfile(for app: MixerApp) -> AudioEqualizerProfile? { equalizer }
+        var listenerInstalled = true
+        var stopped = false
+        var configurationRepairs: [String: Double] = [:]
+        final class EqualizerEngine {
+            var profile: AudioEqualizerProfile?
+            func updateEqualizer(_ profile: AudioEqualizerProfile?) { self.profile = profile }
+        }
+        var engines: [String: EqualizerEngine] = [:]
+        var reconcileCount = 0
+        func reconcileEngines(with apps: [MixerApp]) { reconcileCount += 1 }
         func clearPermissionIfNoActiveAdjustments() {}
     }
 

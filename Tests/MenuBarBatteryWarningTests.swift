@@ -3,14 +3,17 @@
 
 import AppKit
 
-/// Production battery segments, attributed attachments and image drawing with
+/// Production warning colors, attributed attachments and image drawing with
 /// isolated preferences and readings. No status item or hardware is opened.
 enum MenuBarBatteryWarningTests {
     enum ReviewDefaults { static var current: UserDefaults! }
-    enum MenuBarMetric { case battery, batteryTemperature }
+    enum MenuBarMetric { case cpu, cpuTemperature, battery, batteryTemperature, fanSpeed }
     struct SystemSnapshot {
         var power: PowerReading?
         var batteryTemperature: Double?
+        var cpuUsage: Double?
+        var cpuTemperature: Double?
+        var fanSpeeds: [Double] = []
     }
     enum Renderer {
         typealias MenuBarSegment = MenuBarBatteryWarningTests.MenuBarSegment
@@ -61,6 +64,7 @@ enum MenuBarBatteryWarningTests {
         defaults.set(true, forKey: DefaultsKey.menuBarCombineTemperatures)
         segmentContracts(suite, defaults: defaults)
         imageContracts(suite, defaults: defaults)
+        thresholdContracts(suite, defaults: defaults)
     }
 
     private static func snapshot(_ percent: Int? = 10, temperature: Double? = 35, plugged: Bool = false) -> SystemSnapshot {
@@ -73,7 +77,7 @@ enum MenuBarBatteryWarningTests {
     private static func warnings(_ segments: [MenuBarSegment]) -> [BatteryWarning] {
         segments.compactMap {
             switch $0 {
-            case let .metricBlock(_, _, _, _, _, warning), let .batteryBlock(_, _, _, warning, _): return warning
+            case let .metricBlock(_, _, _, _, _, warning, _), let .batteryBlock(_, _, _, warning, _): return warning
             default: return nil
             }
         }
@@ -86,7 +90,7 @@ enum MenuBarBatteryWarningTests {
                     let segments = Renderer.blockSegments(for: snapshot(percent), metrics: metrics, style: style)
                     suite.expect(segments.count == 1 && warnings(segments) == [warning],
                                  "a combined battery reading carries its warning in either order and block style")
-                    if case let .metricBlock(label, value, minimum, _, pressure, _)? = segments.first {
+                    if case let .metricBlock(label, value, minimum, _, pressure, _, _)? = segments.first {
                         suite.expect(label == "BAT" && value == "\(percent)% 35°" && minimum == "100% 999°" && pressure == nil,
                                      "the combined warning preserves the reading, reserved width and absence of a pressure dot")
                     } else { suite.expect(false, "charge and temperature remain one metric block") }
@@ -158,6 +162,69 @@ enum MenuBarBatteryWarningTests {
                      && memory.map { matchingPixels($0, color: .systemYellow) > 0 && matchingPixels($0, color: .systemRed) == 0 } == true,
                      "other metric blocks retain the default warning and their existing pressure color")
         Renderer.overrideSegments = nil
+    }
+
+    private static func thresholdContracts(_ suite: TestSuite, defaults: UserDefaults) {
+        let input = SystemSnapshot(cpuUsage: 0.42, cpuTemperature: 80, fanSpeeds: [2_000, 3_500, 6_500])
+        let cpu = MenuBarThresholdMetric.cpuTemperature
+        let fan = MenuBarThresholdMetric.fanSpeed
+        let combinedCPU: [MenuBarMetric] = [.cpu, .cpuTemperature]
+        func block(_ metrics: [MenuBarMetric]) -> (text: String, highlights: [MenuBarThresholdHighlight])? {
+            Renderer.blockSegments(for: input, metrics: metrics, style: .dense).compactMap { segment in
+                guard case let .metricBlock(_, value, _, _, _, _, highlights) = segment else { return nil }
+                return (value, highlights)
+            }.first
+        }
+        func coloredText(_ block: (text: String, highlights: [MenuBarThresholdHighlight])?,
+                         color: MenuBarThresholdHighlight.Color) -> [String] {
+            guard let block else { return [] }
+            return block.highlights.filter { $0.color == color }.map { (block.text as NSString).substring(with: $0.range) }
+        }
+        func image() -> NSImage? {
+            let title = Renderer.attributed(for: input, metrics: combinedCPU)
+            guard title.length > 0 else { return nil }
+            return (title.attribute(.attachment, at: 0, effectiveRange: nil) as? NSTextAttachment)?.image
+        }
+
+        suite.expect(block(combinedCPU)?.highlights.isEmpty == true && block([.fanSpeed])?.highlights.isEmpty == true,
+                     "temperature and fan colors stay off until enabled independently")
+        let plain = image()
+        defaults.set(true, forKey: cpu.enabledKey)
+        suite.expect(block(combinedCPU)?.text == "42% 80°"
+                     && coloredText(block(combinedCPU), color: .yellow) == ["80°"]
+                     && block([.cpu])?.highlights.isEmpty == true
+                     && block([.fanSpeed])?.highlights.isEmpty == true,
+                     "only the temperature part reaches yellow at the threshold")
+        let yellow = image()
+        defaults.set(75, forKey: cpu.yellowKey)
+        defaults.set(80, forKey: cpu.redKey)
+        let red = image()
+        suite.expect(coloredText(block(combinedCPU), color: .red) == ["80°"],
+                     "the red threshold takes priority even when the displayed value did not change")
+        if let plain, let yellow, let red {
+            suite.expect(plain !== yellow && yellow !== red && plain.size == yellow.size && yellow.size == red.size
+                         && matchingPixels(yellow, color: .systemYellow) > 0 && matchingPixels(red, color: .systemRed) > 0,
+                         "changing the threshold redraws the same size block with the new color")
+        } else { suite.expect(false, "CPU readings produce image attachments") }
+
+        defaults.set(TemperatureUnit.fahrenheit.rawValue, forKey: DefaultsKey.temperatureUnit)
+        for appearance in ["values", "bars"] {
+            defaults.set(appearance, forKey: DefaultsKey.menuBarMetricAppearance)
+            suite.expect(coloredText(block(combinedCPU), color: .red) == ["176°"],
+                         "Fahrenheit preserves the physical threshold with \(appearance) appearance")
+        }
+        defaults.set(true, forKey: fan.enabledKey)
+        let fanBlock = block([.fanSpeed])
+        suite.expect(fanBlock?.text == "2000/3500/6500" && coloredText(fanBlock, color: .yellow) == ["3500"]
+                     && coloredText(fanBlock, color: .red) == ["6500"],
+                     "individual RPM readings cross thresholds independently")
+        defaults.set(true, forKey: DefaultsKey.menuBarAverageFanSpeed)
+        let average = block([.fanSpeed])
+        suite.expect(average?.text == "4000" && coloredText(average, color: .yellow) == ["4000"],
+                     "the average is tinted according to its own value")
+        suite.expect(cpu.thresholds(yellow: 100, red: 70).red > 100
+                     && fan.thresholds(yellow: .infinity, red: .nan).red == fan.defaultRed,
+                     "invalid or reversed saved limits still produce two ordered thresholds")
     }
 
     /// Force the actual NSImage drawing closure into a bitmap and inspect its

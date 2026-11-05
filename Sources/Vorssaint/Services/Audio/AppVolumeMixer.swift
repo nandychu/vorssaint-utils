@@ -48,6 +48,7 @@ struct MixerApp: Identifiable, Equatable {
     var effectiveOutputDeviceUID: String?
     var outputDeviceUnavailable: Bool
     var volume: Double
+    var observedOutputDeviceUIDs: [String] = []
 
     var identity: MixerRowIdentity {
         MixerRowIdentity(rowID: id, persistenceID: persistenceID)
@@ -90,6 +91,8 @@ final class AppVolumeMixer: ObservableObject {
     /// Set when tap creation fails with a permission error, so the panel can
     /// point at the System Audio Recording consent.
     @Published private(set) var needsPermission = false
+    /// Apps whose equalized render callbacks have started, grouped by output.
+    @Published private(set) var equalizerActiveApps: [String: [String]] = [:]
     /// Apps kept out of the list (issue #300), including the Finder when its
     /// own toggle hides it, so the panel can offer to bring any of them back.
     @Published private(set) var hiddenApps: [MixerHiddenApp] = []
@@ -292,6 +295,7 @@ final class AppVolumeMixer: ObservableObject {
         builds.invalidateAll()
         for engine in engines.values { engine.stop() }
         engines.removeAll()
+        if !equalizerActiveApps.isEmpty { equalizerActiveApps = [:] }
         configurationRepairs.removeAll()
         engineChangeAt.removeAll()
         objectsLostAt.removeAll()
@@ -1268,6 +1272,7 @@ final class AppVolumeMixer: ObservableObject {
            engine.outputDeviceUID == targetOutputDeviceUID,
            !engine.requiresRebuild {
             engine.gain = MixerRoutingSupport.gain(forVolume: app.volume)
+            engine.updateEqualizer(equalizerProfile(for: app))
             return
         }
         if let delay = configurationRepairDelay(for: app.id) {
@@ -1322,10 +1327,12 @@ final class AppVolumeMixer: ObservableObject {
             return
         }
 
+        let equalizer = equalizerProfile(for: app)
         buildQueue.async { [weak self] in
             let engine = TapGainEngine(objects: app.audioObjects,
                                        gain: MixerRoutingSupport.gain(forVolume: app.volume),
-                                       outputDeviceUID: targetOutputDeviceUID)
+                                       outputDeviceUID: targetOutputDeviceUID,
+                                       equalizerProfile: equalizer)
             DispatchQueue.main.async {
                 guard let self else {
                     engine?.stop()
@@ -1404,6 +1411,7 @@ final class AppVolumeMixer: ObservableObject {
             return
         }
         engine.gain = MixerRoutingSupport.gain(forVolume: latestApp.volume)
+        engine.updateEqualizer(equalizerProfile(for: latestApp))
         configurationRepairs.removeValue(forKey: id)
         let previous = engines.updateValue(engine, forKey: id)
         engineChangeAt[id] = CFAbsoluteTimeGetCurrent()
@@ -1457,8 +1465,56 @@ final class AppVolumeMixer: ObservableObject {
         return deadline - now
     }
 
+    /// Equalization shares the mixer's tap, so audio is never
+    /// captured twice. A dry app on a different output is not rerouted just
+    /// because the equalizer was enabled.
+    private func equalizerProfile(for app: MixerApp) -> AudioEqualizerProfile? {
+        guard AppFeature.audioEqualizer.isAvailable, AppFeature.mixer.isAvailable,
+              AudioEqualizerSettings.shared.enabled,
+              AudioEqualizerSupport.supportsSource(bundleIdentifier: app.persistenceID),
+              let uid = app.effectiveOutputDeviceUID,
+              let device = outputDevices.first(where: { $0.uid == uid }),
+              AudioEqualizerSupport.canProcess(featureAvailable: true, mixerAvailable: true,
+                  enabled: true, physicalOutput: AudioEqualizerSupport.supportsOutput(
+                    uid: device.uid, isVirtual: device.priorityTier == .virtual),
+                  bypassed: app.isBypassed, hasAudio: !app.audioObjects.isEmpty) else { return nil }
+        let alreadyAdjusted = app.selectedOutputDeviceUID != nil || abs(app.volume - 1) > 0.0001
+        guard alreadyAdjusted || Set(app.observedOutputDeviceUIDs) == [uid] else { return nil }
+        return AudioEqualizerSettings.shared.preferences.profile(for: uid)
+    }
+
+    func equalizerDidChange(retryFailedEngines: Bool = false) {
+        guard listenerInstalled, !stopped else { return }
+        if retryFailedEngines {
+            // A deliberate off/on starts a new attempt, including when a
+            // previous failure has already removed its engine. Slider edits
+            // never reset this guard or create an endless capture retry loop.
+            engineRecovery.clearAll()
+            configurationRepairs.removeAll()
+            builds.invalidateAll()
+        }
+        for app in apps { engines[app.id]?.updateEqualizer(equalizerProfile(for: app)) }
+        reconcileEngines(with: apps)
+        refreshApps()
+    }
+
+
+    private func publishEqualizerActivity() {
+        var active: [String: [String]] = [:]
+        for app in apps where app.isPlaying && equalizerProfile(for: app) != nil {
+            guard let engine = engines[app.id], engine.renderCycles > 0,
+                  engine.outputDeviceUID == app.effectiveOutputDeviceUID,
+                  engine.tappedObjects == app.audioObjects,
+                  !engine.requiresRebuild else { continue }
+            active[engine.outputDeviceUID, default: []].append(app.name)
+        }
+        active = active.mapValues { $0.sorted() }
+        if active != equalizerActiveApps { equalizerActiveApps = active }
+    }
+
     private func rowMayBeTapped(_ app: MixerApp) -> Bool {
         guard !app.isBypassed else { return false }
+        if equalizerProfile(for: app) != nil { return true }
         return MixerRoutingSupport.rowMayBeTapped(
             savedVolume: storedVolume(for: app.identity, saved: savedVolumes()),
             savedRouteUID: storedRoute(for: app.identity, saved: savedOutputDeviceUIDs()),
@@ -1468,6 +1524,7 @@ final class AppVolumeMixer: ObservableObject {
 
     private func appNeedsEngine(_ app: MixerApp) -> Bool {
         guard !app.isBypassed else { return false }
+        if equalizerProfile(for: app) != nil { return true }
         // A universal route and its effective output come from one snapshot.
         // The picker may already show the next successful choice, but that
         // must not dismantle this route before its replacement is ready.
@@ -1500,6 +1557,7 @@ final class AppVolumeMixer: ObservableObject {
     /// never reads a property that another thread can be writing.
     private struct RefreshRequest {
         let includeApps: Bool
+        let equalizerEnabled: Bool
         let previousDefaultUID: String?
         let previousOutputDevices: [MixerOutputDevice]
         let lowered: LoweredOutputState
@@ -1548,6 +1606,7 @@ final class AppVolumeMixer: ObservableObject {
         let universalUID = universalOutputDeviceUID
         let request = RefreshRequest(
             includeApps: processMonitoringEnabled,
+            equalizerEnabled: AppFeature.audioEqualizer.isAvailable && AudioEqualizerSettings.shared.enabled,
             previousDefaultUID: currentOutputDeviceUID,
             previousOutputDevices: outputDevices,
             lowered: LoweredOutputState(lastAutomaticLoweredOutputUID: lastAutomaticLoweredOutputUID,
@@ -1776,6 +1835,10 @@ final class AppVolumeMixer: ObservableObject {
             let route = isBypassed ? nil : storedRoute(for: identity,
                                                        saved: savedOutputs,
                                                        session: request.sessionRoutes)
+            let observedIDs = request.equalizerEnabled ? Set(objects.flatMap {
+                objectList($0, kAudioProcessPropertyDevices, scope: kAudioObjectPropertyScopeOutput)
+            }) : Set<AudioObjectID>()
+            let observedUIDs = nextOutputDevices.filter { observedIDs.contains($0.audioObjectID) }.map(\.uid)
             next.append(MixerApp(id: identity.rowID,
                                  persistenceID: identity.persistenceID,
                                  ownerPid: owner,
@@ -1795,7 +1858,8 @@ final class AppVolumeMixer: ObservableObject {
                                     availableUIDs: availableUIDs),
                                  volume: isBypassed ? 1 : (storedVolume(for: identity,
                                                                        saved: saved,
-                                                                       session: request.sessionVolumes) ?? 1)))
+                                                                       session: request.sessionVolumes) ?? 1),
+                                 observedOutputDeviceUIDs: observedUIDs))
         }
         if MixerRoutingSupport.needsPersistentFinderRow(
             showFinder: showFinder,
@@ -1897,7 +1961,9 @@ final class AppVolumeMixer: ObservableObject {
                                      selectedOutputDeviceUID: existing.selectedOutputDeviceUID,
                                      effectiveOutputDeviceUID: existing.effectiveOutputDeviceUID,
                                      outputDeviceUnavailable: existing.outputDeviceUnavailable,
-                                     volume: existing.volume)
+                                     volume: existing.volume,
+                                     observedOutputDeviceUIDs: Array(Set(existing.observedOutputDeviceUIDs)
+                                        .union(app.observedOutputDeviceUIDs)).sorted())
         }
 
         return merged
@@ -2011,6 +2077,7 @@ final class AppVolumeMixer: ObservableObject {
     /// Rows that keep changing fold into a single trailing rebuild instead of
     /// one per notification.
     private func reconcileEngines(with apps: [MixerApp]) {
+        defer { publishEqualizerActivity() }
         let apps = Self.coalescingAppsWithDuplicateIDs(apps)
         // Only while AirPlay is offered, so this never creates the manager.
         if AirPlayRouteManager.isListed {
@@ -2104,6 +2171,7 @@ final class AppVolumeMixer: ObservableObject {
             // this pass, which repeats while the app plays, catches one that
             // was not.
             engine.refreshLevelCompensation(immediately: false)
+            engine.updateEqualizer(equalizerProfile(for: app))
 
             let listedUIDs = outputDevices.map(\.uid)
             // An AirPlay engine whose clock output went away keeps its route
@@ -2824,11 +2892,13 @@ private protocol GainEngine: AnyObject {
     /// unannounced, and corrects the tap's level for it. Unless `immediately`,
     /// at most once a second, however often it is asked.
     func refreshLevelCompensation(immediately: Bool)
+    func updateEqualizer(_ profile: AudioEqualizerProfile?)
     func stop()
 }
 
 private extension GainEngine {
     var requiresRebuild: Bool { false }
+    func updateEqualizer(_ profile: AudioEqualizerProfile?) {}
 }
 
 /// Keeps a tap's level correct for the outputs its processes play to.
@@ -3231,8 +3301,13 @@ private final class MixerTapConfiguration {
                 let immediately = immediatePending
                 pending = false
                 immediatePending = false
-                return !stopped && MixerRoutingSupport.tapLevelReadIsDue(
-                    immediately: immediately, sinceLastRead: CFAbsoluteTimeGetCurrent() - lastReadAt)
+                // A routine refresh may queue behind a suspended format
+                // validation. That earlier read leaves rendering suspended
+                // for its pending successor; throttling the successor would
+                // then leave a valid engine silent forever. Suspended audio
+                // always needs a completed validation before it can resume.
+                return !stopped && (!canRender || MixerRoutingSupport.tapLevelReadIsDue(
+                    immediately: immediately, sinceLastRead: CFAbsoluteTimeGetCurrent() - lastReadAt))
             }
             guard shouldRead else { return }
             lastReadAt = CFAbsoluteTimeGetCurrent()
@@ -3353,6 +3428,9 @@ private final class TapGainEngine: GainEngine {
         }
     }
 
+    private var equalizer: AudioEqualizerDSP?
+    func updateEqualizer(_ profile: AudioEqualizerProfile?) { equalizer?.update(profile) }
+
     private let gainBox = AtomicFloatBox(1)
     /// Multiplies the gain to give back what the tap took from the app's
     /// output. Same one-float exchange as the gain.
@@ -3367,7 +3445,8 @@ private final class TapGainEngine: GainEngine {
     private var configuration: MixerTapConfiguration?
     private var levelWatch: LevelCompensationWatch?
 
-    init?(objects: [AudioObjectID], gain: Float, outputDeviceUID: String) {
+    init?(objects: [AudioObjectID], gain: Float, outputDeviceUID: String,
+          equalizerProfile: AudioEqualizerProfile? = nil) {
         tappedObjects = objects
         gainBox.value = min(max(gain, 0), Float(AppVolumeMixer.maxVolume))
         self.outputDeviceUID = outputDeviceUID
@@ -3422,6 +3501,9 @@ private final class TapGainEngine: GainEngine {
             DispatchQueue.main.async { AppVolumeMixer.shared.reconcileAudioConfigurationChanges() }
         }
         self.configuration = configuration
+        let equalizer = AudioEqualizerDSP(sampleRate: sampleRate,
+            channelCapacity: outputChannels.reduce(0, +), profile: equalizerProfile)
+        self.equalizer = equalizer
         let ramp = TapLevelRamp()
         let appliedGain = MixerRender.AppliedGain()
         // A boost pushes loud samples past full scale, and clamping the
@@ -3442,13 +3524,23 @@ private final class TapGainEngine: GainEngine {
             guard configuration.canRender else {
                 MixerRender.silence(outputBuffers)
                 limiterBox.reset()
+                equalizer.reset()
                 appliedGain.reset()
                 return
             }
             // The output clock keeps moving through a short or missing tap
             // buffer. Advance the delay over its silence too, or buffered
             // audio is cut off and then replayed late on the next callback.
-            defer { limiterBox.process(outputBuffers, release: release.value) }
+            defer {
+                if equalizer.process(outputBuffers) {
+                    // EQ gain is linear, like AVAudioUnitEQ: do not compress
+                    // the whole mix whenever a boosted band reaches a peak.
+                    // Optional automatic preamp supplies fixed headroom.
+                    limiterBox.reset()
+                } else {
+                    limiterBox.process(outputBuffers, release: release.value)
+                }
+            }
             guard let tapIndex = MixerRender.tapBufferIndex(in: inputBuffers,
                                                             tapChannels: tapChannels) else {
                 // No samples to put in the buffer is not a reason to leave it:

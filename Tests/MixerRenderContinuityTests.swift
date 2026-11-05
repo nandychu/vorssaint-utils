@@ -31,9 +31,11 @@ enum MixerRenderContinuityTests {
         let configuration = Configuration()
         let tapChannels: Int
         let limiterBox: LimiterBox
+        let equalizer: AudioEqualizerDSP
 
         init(tapChannels: Int = 2, channelCapacity: Int? = nil) {
             self.tapChannels = tapChannels
+            equalizer = AudioEqualizerDSP(sampleRate: 48000, channelCapacity: channelCapacity ?? tapChannels)
             limiterBox = LimiterBox(channelCapacity: channelCapacity ?? tapChannels)
         }
 

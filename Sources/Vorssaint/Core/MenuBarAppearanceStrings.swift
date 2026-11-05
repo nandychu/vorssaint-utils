@@ -14,6 +14,9 @@ struct MenuBarAppearanceStrings {
     let highColor: String
     let mediumFrom: String
     let highFrom: String
+    let readingColors: String
+    let yellowFrom: String
+    let redFrom: String
 }
 
 extension FeatureStrings {
@@ -49,7 +52,10 @@ extension MenuBarAppearanceStrings {
         mediumColor: "Medium color",
         highColor: "High color",
         mediumFrom: "Medium from",
-        highFrom: "High from"
+        highFrom: "High from",
+        readingColors: "Color by threshold",
+        yellowFrom: "Yellow from",
+        redFrom: "Red from"
     )
 
     static let ptBR = MenuBarAppearanceStrings(
@@ -62,7 +68,10 @@ extension MenuBarAppearanceStrings {
         mediumColor: "Cor média",
         highColor: "Cor alta",
         mediumFrom: "Médio a partir de",
-        highFrom: "Alto a partir de"
+        highFrom: "Alto a partir de",
+        readingColors: "Cor por limite",
+        yellowFrom: "Amarelo a partir de",
+        redFrom: "Vermelho a partir de"
     )
 
     static let tr = MenuBarAppearanceStrings(
@@ -75,7 +84,10 @@ extension MenuBarAppearanceStrings {
         mediumColor: "Orta renk",
         highColor: "Yüksek renk",
         mediumFrom: "Orta başlangıcı",
-        highFrom: "Yüksek başlangıcı"
+        highFrom: "Yüksek başlangıcı",
+        readingColors: "Eşiğe göre renklendir",
+        yellowFrom: "Sarı eşiği",
+        redFrom: "Kırmızı eşiği"
     )
 
     static let ru = MenuBarAppearanceStrings(
@@ -88,7 +100,10 @@ extension MenuBarAppearanceStrings {
         mediumColor: "Средний цвет",
         highColor: "Высокий цвет",
         mediumFrom: "Средний от",
-        highFrom: "Высокий от"
+        highFrom: "Высокий от",
+        readingColors: "Цвет по порогу",
+        yellowFrom: "Жёлтый от",
+        redFrom: "Красный от"
     )
 
     static let es = MenuBarAppearanceStrings(
@@ -101,7 +116,10 @@ extension MenuBarAppearanceStrings {
         mediumColor: "Color medio",
         highColor: "Color alto",
         mediumFrom: "Medio desde",
-        highFrom: "Alto desde"
+        highFrom: "Alto desde",
+        readingColors: "Colorear por umbral",
+        yellowFrom: "Amarillo desde",
+        redFrom: "Rojo desde"
     )
 
     static let sk = MenuBarAppearanceStrings(
@@ -114,7 +132,10 @@ extension MenuBarAppearanceStrings {
         mediumColor: "Stredná farba",
         highColor: "Vysoká farba",
         mediumFrom: "Stredná od",
-        highFrom: "Vysoká od"
+        highFrom: "Vysoká od",
+        readingColors: "Farba podľa prahu",
+        yellowFrom: "Žltá od",
+        redFrom: "Červená od"
     )
 
     static let de = MenuBarAppearanceStrings(
@@ -127,7 +148,10 @@ extension MenuBarAppearanceStrings {
         mediumColor: "Mittlere Farbe",
         highColor: "Hohe Farbe",
         mediumFrom: "Mittel ab",
-        highFrom: "Hoch ab"
+        highFrom: "Hoch ab",
+        readingColors: "Farbe nach Schwellenwert",
+        yellowFrom: "Gelb ab",
+        redFrom: "Rot ab"
     )
 
     static let fr = MenuBarAppearanceStrings(
@@ -140,7 +164,10 @@ extension MenuBarAppearanceStrings {
         mediumColor: "Couleur moyenne",
         highColor: "Couleur élevée",
         mediumFrom: "Moyen à partir de",
-        highFrom: "Élevé à partir de"
+        highFrom: "Élevé à partir de",
+        readingColors: "Couleur selon le seuil",
+        yellowFrom: "Jaune à partir de",
+        redFrom: "Rouge à partir de"
     )
 
     static let it = MenuBarAppearanceStrings(
@@ -153,7 +180,10 @@ extension MenuBarAppearanceStrings {
         mediumColor: "Colore medio",
         highColor: "Colore alto",
         mediumFrom: "Medio da",
-        highFrom: "Alto da"
+        highFrom: "Alto da",
+        readingColors: "Colore in base alla soglia",
+        yellowFrom: "Giallo da",
+        redFrom: "Rosso da"
     )
 
     static let ja = MenuBarAppearanceStrings(
@@ -166,7 +196,10 @@ extension MenuBarAppearanceStrings {
         mediumColor: "中程度の色",
         highColor: "高負荷の色",
         mediumFrom: "中程度の開始",
-        highFrom: "高負荷の開始"
+        highFrom: "高負荷の開始",
+        readingColors: "しきい値で色を変更",
+        yellowFrom: "黄色のしきい値",
+        redFrom: "赤色のしきい値"
     )
 
     static let ko = MenuBarAppearanceStrings(
@@ -179,7 +212,10 @@ extension MenuBarAppearanceStrings {
         mediumColor: "중간 색상",
         highColor: "높음 색상",
         mediumFrom: "중간 시작",
-        highFrom: "높음 시작"
+        highFrom: "높음 시작",
+        readingColors: "임계값에 따라 색상 변경",
+        yellowFrom: "노란색 시작 값",
+        redFrom: "빨간색 시작 값"
     )
 
     static let zhHans = MenuBarAppearanceStrings(
@@ -192,7 +228,10 @@ extension MenuBarAppearanceStrings {
         mediumColor: "中等颜色",
         highColor: "高负载颜色",
         mediumFrom: "中等起点",
-        highFrom: "高负载起点"
+        highFrom: "高负载起点",
+        readingColors: "按阈值变色",
+        yellowFrom: "黄色阈值",
+        redFrom: "红色阈值"
     )
 
     static let zhTW = MenuBarAppearanceStrings(
@@ -205,7 +244,10 @@ extension MenuBarAppearanceStrings {
         mediumColor: "中等顏色",
         highColor: "高負載顏色",
         mediumFrom: "中等起點",
-        highFrom: "高負載起點"
+        highFrom: "高負載起點",
+        readingColors: "依門檻變色",
+        yellowFrom: "黃色門檻",
+        redFrom: "紅色門檻"
     )
 
     static let zhHK = MenuBarAppearanceStrings(
@@ -218,7 +260,10 @@ extension MenuBarAppearanceStrings {
         mediumColor: "中等顏色",
         highColor: "高負載顏色",
         mediumFrom: "中等起點",
-        highFrom: "高負載起點"
+        highFrom: "高負載起點",
+        readingColors: "按門檻變色",
+        yellowFrom: "黃色門檻",
+        redFrom: "紅色門檻"
     )
     static let uk = MenuBarAppearanceStrings(
         label: "Відображення використання",
@@ -230,6 +275,9 @@ extension MenuBarAppearanceStrings {
         mediumColor: "Середній колір",
         highColor: "Високий колір",
         mediumFrom: "Середній від",
-        highFrom: "Високий від"
+        highFrom: "Високий від",
+        readingColors: "Колір за порогом",
+        yellowFrom: "Жовтий від",
+        redFrom: "Червоний від"
     )
 }

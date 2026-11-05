@@ -414,6 +414,10 @@ if (( TEST )); then
         Sources/Vorssaint/Core/KillProcessStrings.swift
         Sources/Vorssaint/Core/PortManagerStrings.swift
         Sources/Vorssaint/Core/SecurityScanStrings.swift
+        Sources/Vorssaint/Core/CPUStressStrings.swift
+        Sources/Vorssaint/Core/AudioEqualizerStrings.swift
+        Sources/Vorssaint/Services/Audio/AudioEqualizerSupport.swift
+        Sources/Vorssaint/Services/Audio/AudioEqualizerDSP.swift
         Sources/Vorssaint/Core/WhatsAppDownloadStrings.swift
         Sources/Vorssaint/Core/WhatsAppOrganizerStrings.swift
         Sources/Vorssaint/Core/ReleaseNotes.swift

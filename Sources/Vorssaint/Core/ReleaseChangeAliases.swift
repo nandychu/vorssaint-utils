@@ -140,6 +140,8 @@ enum ReleaseChangeAliases {
         case .killProcess: return ["kill process", "force kill", "process tree"]
         case .portManager: return ["port manager"]
         case .securityScan: return ["security scan"]
+        case .cpuStress: return ["cpu stress test", "cpu stress"]
+        case .audioEqualizer: return ["audio equalizer", "ten-band equalizer"]
         case .notch: return ["dynamic island", "island", "islands", "notch", "volume keys", "volume key",
             "mute key", "volume feedback", "volume indicator", "volume notice", "new track indicator",
             "displays without a notch", "displays without a camera cutout"]

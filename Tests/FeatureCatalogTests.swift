@@ -386,7 +386,7 @@ enum FeatureCatalogTests {
 
         // MARK: Features hub catalog
 
-        suite.expect(AppFeature.allCases.count == 80, "feature catalog has 80 features")
+        suite.expect(AppFeature.allCases.count == 82, "feature catalog has 82 features")
         suite.expect(Set(AppFeature.allCases.map(\.rawValue)).count == AppFeature.allCases.count,
                "feature ids are unique")
         suite.expect(AppFeature.allCases.map(\.rawValue) == [
@@ -395,11 +395,12 @@ enum FeatureCatalogTests {
             "mouseClickDebounce", "keyboardDebounce", "textSnippets", "superKey", "quitWindowProtection",
             "clipboardHistory", "pastePlain", "finderCutPaste", "finderRename", "shelf", "urlCleaner",
             "diskImageInstaller",
-            "mixer", "soundOutputSwitcher", "audioPriority", "micMute", "musicBlock",
+            "mixer", "audioEqualizer", "soundOutputSwitcher", "audioPriority", "micMute", "musicBlock",
             "keepAwake", "brightness", "extraBrightness", "bluetoothSleep",
             "quickLauncher", "quickToggles", "quitApps", "colorPicker", "screenOCR", "cleaningMode", "mediaTools",
             "cleaner", "uninstaller", "homebrew", "appUpdates", "screenshot", "cameraPreview",
-            "radialMenu", "scratchpad", "commandBar", "screenRecorder", "wallpaper", "killProcess", "portManager", "securityScan", "notch", "notchCalendar", "notchNotifications", "notchGestures", "notchTimer", "notchAccessories", "notchLyrics", "notchQueue", "notchLiveEqualizer", "notchDownloads", "notchAgents", "notchWatch", "notchMascot",
+            "radialMenu", "scratchpad", "commandBar", "screenRecorder", "wallpaper", "killProcess", "portManager", "securityScan",
+            "cpuStress", "notch", "notchCalendar", "notchNotifications", "notchGestures", "notchTimer", "notchAccessories", "notchLyrics", "notchQueue", "notchLiveEqualizer", "notchDownloads", "notchAgents", "notchWatch", "notchMascot",
             "monitorCPU", "monitorGPU", "monitorMemory", "monitorNetwork", "monitorDisk", "monitorPower",
             "connectedDevices", "fanControl",
         ], "feature ids are stable (they persist inside availability keys)")
@@ -526,7 +527,7 @@ enum FeatureCatalogTests {
                 installDefaults.persistentDomain(forName: installSuiteName) ?? [:]
             }
             for feature in AppFeature.allCases
-            where !feature.enabledKeys.isEmpty && feature != .notchLiveEqualizer {
+            where !feature.enabledKeys.isEmpty && feature != .notchLiveEqualizer && feature != .audioEqualizer {
                 feature.enableOnFirstInstall(in: installDefaults, savedValues: savedValues())
                 suite.expect(feature.enabledKeys.contains {
                     savedValues()[$0] as? Bool == true
@@ -537,6 +538,9 @@ enum FeatureCatalogTests {
                                                                 savedValues: savedValues())
             suite.expect(savedValues()[DefaultsKey.notchLiveEqualizer] == nil,
                    "installing the live equalizer leaves its audio recording switch off")
+            AppFeature.audioEqualizer.enableOnFirstInstall(in: installDefaults, savedValues: savedValues())
+            suite.expect(savedValues()[DefaultsKey.audioEqualizerEnabled] == nil,
+                         "installing the audio equalizer leaves processing off until the user enables it")
             AppFeature.windowLayout.enableOnFirstInstall(in: installDefaults,
                                                           savedValues: savedValues())
             suite.expect(installDefaults.bool(forKey: DefaultsKey.windowLayoutShortcutsEnabled),
@@ -1344,16 +1348,15 @@ enum FeatureCatalogTests {
                 && FanControlPolicy.telemetryReadings(expectedCount: 1, readings: [.infinity]) == nil
                 && FanControlPolicy.telemetryReadings(expectedCount: 1, readings: [-1]) == nil,
                "fan telemetry rejects no-fan, missing and malformed sensor sets")
-        suite.expect(FanControlPolicy.menuBarValue(for: [1_249.6]) == "1250"
-                && FanControlPolicy.menuBarValue(for: [1_200, 1_350]) == "1200/1350"
-                && FanControlPolicy.menuBarValue(for: []) == nil
-                && FanControlPolicy.menuBarValue(for: [.infinity]) == nil,
-               "fan RPM menu bar text supports one or several validated fans")
-        suite.expect(FanControlPolicy.menuBarValue(for: [1_199.8, 1_200.6], average: true) == "1200"
-                && FanControlPolicy.menuBarValue(for: [0, 1_301], average: true) == "651"
-                && FanControlPolicy.menuBarValue(for: [], average: true) == nil
-                && FanControlPolicy.menuBarValue(for: [1_200, .infinity], average: true) == nil,
-               "average RPM rounds after averaging and includes stopped fans")
+        suite.expect(FanControlPolicy.menuBarReadings(for: [1_249.6], average: false) == [1_249.6]
+                && FanControlPolicy.menuBarReadings(for: [1_200, 1_350], average: false) == [1_200, 1_350]
+                && FanControlPolicy.menuBarReadings(for: [], average: false) == nil
+                && FanControlPolicy.menuBarReadings(for: [.infinity], average: false) == nil,
+               "fan RPM menu bar readings preserve precision and validate each fan")
+        suite.expect(FanControlPolicy.menuBarReadings(for: [0, 1_301], average: true) == [650.5]
+                && FanControlPolicy.menuBarReadings(for: [], average: true) == nil
+                && FanControlPolicy.menuBarReadings(for: [1_200, .infinity], average: true) == nil,
+               "average RPM includes stopped fans and retains fractional RPM for display rounding")
         suite.expect(FanControlPolicy.menuBarWidthUnits(fanCount: 1) == 12
                 && FanControlPolicy.menuBarWidthUnits(fanCount: 2) == 18
                 && FanControlPolicy.menuBarWidthUnits(fanCount: 0) == 0,

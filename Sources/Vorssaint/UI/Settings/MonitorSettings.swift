@@ -417,6 +417,8 @@ private struct MenuBarMetricTile: View {
             return Defaults.sanitizedMenuBarMemoryStyle(memoryStyle) != "percent"
                 ? l10n.s.monitorMemoryPressureDot : FeatureStrings.mouseClickDebounce(l10n.language).moreOptions
         case .network: return uploadFirst ? "↑ ↓" : "↓ ↑"
+        case .cpuTemperature:
+            return FeatureStrings.mouseClickDebounce(l10n.language).moreOptions
         case .fanSpeed:
             return averageFanSpeed ? averageRPMTitle : FeatureStrings.mouseClickDebounce(l10n.language).moreOptions
         case .diskUsage:
@@ -442,8 +444,16 @@ private struct MenuBarMetricTile: View {
             return AnyView(MonitorTokenOption(symbol: "arrow.up.arrow.down",
                                                  title: l10n.s.monitorNetworkUploadFirst,
                                                  isOn: $uploadFirst))
-        case .fanSpeed where SystemMonitor.fanTelemetryCount > 1:
-            return AnyView(MonitorTokenOption(symbol: "divide", title: averageRPMTitle, isOn: $averageFanSpeed))
+        case .cpuTemperature:
+            return AnyView(MenuBarThresholdSettings(metric: .cpuTemperature))
+        case .fanSpeed:
+            return AnyView(VStack(alignment: .leading, spacing: 10) {
+                if SystemMonitor.fanTelemetryCount > 1 {
+                    MonitorTokenOption(symbol: "divide", title: averageRPMTitle, isOn: $averageFanSpeed)
+                    Divider()
+                }
+                MenuBarThresholdSettings(metric: .fanSpeed)
+            })
         case .diskUsage:
             return AnyView(Picker(l10n.s.diskMenuBarStyleLabel, selection: $diskStyle) {
                 Text(l10n.s.diskMenuBarUsedPercentage).tag(DiskMenuBarStyle.percent)
@@ -453,6 +463,75 @@ private struct MenuBarMetricTile: View {
             .pickerStyle(.menu))
         default:
             return nil
+        }
+    }
+}
+
+private struct MenuBarThresholdSettings: View {
+    @ObservedObject private var l10n = L10n.shared
+    @AppStorage(DefaultsKey.temperatureUnit) private var temperatureUnit = TemperatureUnit.celsius.rawValue
+    @AppStorage private var enabled: Bool
+    @AppStorage private var yellow: Double
+    @AppStorage private var red: Double
+    let metric: MenuBarThresholdMetric
+
+    init(metric: MenuBarThresholdMetric) {
+        self.metric = metric
+        _enabled = AppStorage(wrappedValue: false, metric.enabledKey)
+        _yellow = AppStorage(wrappedValue: metric.defaultYellow, metric.yellowKey)
+        _red = AppStorage(wrappedValue: metric.defaultRed, metric.redKey)
+    }
+
+    var body: some View {
+        let strings = FeatureStrings.menuBarAppearance(l10n.language)
+        let thresholds = metric.thresholds(yellow: yellow, red: red)
+        VStack(alignment: .leading, spacing: 9) {
+            MonitorTokenOption(symbol: "paintpalette", title: strings.readingColors, isOn: $enabled)
+            if enabled {
+                thresholdRow(strings.yellowFrom, color: .yellow, value: thresholds.yellow,
+                             limits: metric.limits.lowerBound...max(metric.limits.lowerBound, thresholds.red - metric.minimumGap)) {
+                    yellow = $0
+                    red = thresholds.red
+                }
+                thresholdRow(strings.redFrom, color: .red, value: thresholds.red,
+                             limits: min(metric.limits.upperBound, thresholds.yellow + metric.minimumGap)...metric.limits.upperBound) {
+                    yellow = thresholds.yellow
+                    red = $0
+                }
+            }
+        }
+    }
+
+    private var unit: TemperatureUnit { TemperatureUnit(rawValue: temperatureUnit) ?? .celsius }
+    private var usesFahrenheit: Bool { metric == .cpuTemperature && unit == .fahrenheit }
+
+    private func displayValue(_ reading: Double) -> Double {
+        usesFahrenheit ? reading * 9 / 5 + 32 : reading
+    }
+
+    private func thresholdRow(_ title: String, color: MenuBarThresholdHighlight.Color, value: Double,
+                              limits: ClosedRange<Double>, set: @escaping (Double) -> Void) -> some View {
+        let isFan = metric == .fanSpeed
+        let displayLimits = displayValue(limits.lowerBound)...displayValue(limits.upperBound)
+        let binding = Binding(get: { displayValue(value) }, set: { edited in
+            guard edited.isFinite else { return }
+            let reading = usesFahrenheit ? (edited - 32) * 5 / 9 : edited
+            set(min(limits.upperBound, max(limits.lowerBound, isFan ? reading.rounded() : reading)))
+        })
+        return HStack(spacing: 5) {
+            Circle().fill(Color(nsColor: MenuBarRenderer.nsColor(for: color))).frame(width: 6, height: 6)
+                .accessibilityHidden(true)
+            Text(title).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 2)
+            TextField(title, value: binding,
+                      format: .number.grouping(.never).precision(.fractionLength(0...(isFan ? 0 : 1))))
+                .multilineTextAlignment(.trailing)
+                .monospacedDigit()
+                .frame(width: isFan ? 50 : 44)
+            Text(isFan ? "RPM" : MetricFormat.temperatureUnitSuffix(unit))
+                .foregroundStyle(.secondary)
+            Stepper(title, value: binding, in: displayLimits, step: isFan ? 100 : 1)
+                .labelsHidden()
         }
     }
 }

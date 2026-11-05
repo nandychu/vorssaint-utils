@@ -197,7 +197,8 @@ enum MenuBarSegment {
     case symbol(String)
     case largeSymbol(String)
     case metricBlock(label: String, value: String, minimumValue: String, style: MenuBarBlockStyle,
-                     pressure: MemoryPressure?, warning: BatteryWarning = .none)
+                     pressure: MemoryPressure?, warning: BatteryWarning = .none,
+                     highlights: [MenuBarThresholdHighlight] = [])
     case usageBarBlock(label: String, fraction: Double?, style: MenuBarBlockStyle, pressure: MemoryPressure?)
     case networkBlock(down: String, up: String, style: MenuBarBlockStyle)
     case diskActivityBlock(read: String, write: String, style: MenuBarBlockStyle)
@@ -360,16 +361,10 @@ enum MenuBarRenderer {
                 if combineTemperatures {
                     guard !renderedCPU else { break }
                     renderedCPU = true
-                    let usageFraction = enabled.contains(.cpu) ? snapshot.cpuUsage : nil
-                    let usage = usageFraction.map(percent)
-                    let temperature = enabled.contains(.cpuTemperature) ? snapshot.cpuTemperature.map(temperatureCompact) : nil
-                    if usesBars {
-                        let group = usageAndTemperatureSegments(label: "CPU",
-                                                                fraction: usageFraction,
-                                                                temperature: temperature,
-                                                                style: style)
-                        if !group.isEmpty { groups.append(group) }
-                    } else if let value = combinedComponentValue(primary: usage, temperature: temperature) {
+                    let usage = enabled.contains(.cpu) ? snapshot.cpuUsage.map(percent) : nil
+                    let reading = enabled.contains(.cpuTemperature) ? snapshot.cpuTemperature : nil
+                    let temperature = reading.map(temperatureCompact)
+                    if let value = combinedComponentValue(primary: usage, temperature: temperature) {
                         groups.append([.metricBlock(label: combinedComponentLabel("CPU",
                                                                                   hasPrimary: usage != nil,
                                                                                   hasTemperature: temperature != nil),
@@ -377,17 +372,22 @@ enum MenuBarRenderer {
                                                     minimumValue: minimumCombinedValue(primary: usage != nil,
                                                                                        temperature: temperature != nil),
                                                     style: style,
-                                                    pressure: nil)])
+                                                    pressure: nil,
+                                                    highlights: cpuTemperatureHighlights(reading, in: value,
+                                                                                         temperature: temperature))])
                     }
                     break
                 }
                 guard metric == .cpu else {
                     if let temperature = snapshot.cpuTemperature {
+                        let value = temperatureCompact(temperature)
                         groups.append([.metricBlock(label: temperatureLabel("CPU"),
-                                                    value: temperatureCompact(temperature),
+                                                    value: value,
                                                     minimumValue: "999°",
                                                     style: style,
-                                                    pressure: nil)])
+                                                    pressure: nil,
+                                                    highlights: cpuTemperatureHighlights(temperature, in: value,
+                                                                                         temperature: value))])
                     }
                     break
                 }
@@ -592,20 +592,44 @@ enum MenuBarRenderer {
                                                 pressure: nil)])
                 }
             case .fanSpeed:
-                let average = averagesFanSpeeds
-                if let value = FanControlPolicy.menuBarValue(for: snapshot.fanSpeeds, average: average) {
-                    let readingCount = average ? 1 : snapshot.fanSpeeds.count
-                    let minimumValue = Array(repeating: "20000", count: readingCount)
-                        .joined(separator: "/")
+                if let readings = FanControlPolicy.menuBarReadings(for: snapshot.fanSpeeds, average: averagesFanSpeeds) {
+                    let (value, highlights) = fanSpeedValue(readings)
+                    let minimumValue = Array(repeating: "20000", count: readings.count).joined(separator: "/")
                     groups.append([.metricBlock(label: "RPM",
                                                 value: value,
                                                 minimumValue: minimumValue,
                                                 style: style,
-                                                pressure: nil)])
+                                                pressure: nil,
+                                                highlights: highlights)])
                 }
             }
         }
         return blockJoined(groups, style: style)
+    }
+
+    private static func cpuTemperatureHighlights(_ reading: Double?, in value: String,
+                                                 temperature: String?) -> [MenuBarThresholdHighlight] {
+        guard let reading, let temperature,
+              let thresholds = MenuBarThresholdMetric.cpuTemperature.activeThresholds() else { return [] }
+        let length = temperature.utf16.count
+        let range = NSRange(location: value.utf16.count - length, length: length)
+        return thresholds.highlight(for: reading, range: range).map { [$0] } ?? []
+    }
+
+    private static func fanSpeedValue(_ readings: [Double]) -> (String, [MenuBarThresholdHighlight]) {
+        let thresholds = MenuBarThresholdMetric.fanSpeed.activeThresholds()
+        var value = ""
+        var highlights: [MenuBarThresholdHighlight] = []
+        for reading in readings {
+            if !value.isEmpty { value += "/" }
+            let text = String(Int(reading.rounded()))
+            let range = NSRange(location: value.utf16.count, length: text.utf16.count)
+            if let highlight = thresholds?.highlight(for: reading, range: range) {
+                highlights.append(highlight)
+            }
+            value += text
+        }
+        return (value, highlights)
     }
 
     private static func usageAndTemperatureSegments(label: String,
@@ -734,13 +758,14 @@ enum MenuBarRenderer {
                 result.append(symbolAttachment(named: name, stacked: stacked))
             case let .largeSymbol(name):
                 result.append(symbolAttachment(named: name, stacked: stacked, enlarged: true))
-            case let .metricBlock(label, value, minimumValue, style, pressure, warning):
+            case let .metricBlock(label, value, minimumValue, style, pressure, warning, highlights):
                 result.append(metricBlockAttachment(label: label,
                                                     value: value,
                                                     minimumValue: minimumValue,
                                                     style: style,
                                                     pressure: pressure,
-                                                    warning: warning))
+                                                    warning: warning,
+                                                    highlights: highlights))
             case let .usageBarBlock(label, fraction, style, pressure):
                 result.append(usageBarBlockAttachment(label: label,
                                                       fraction: fraction,
@@ -798,13 +823,15 @@ enum MenuBarRenderer {
                                               minimumValue: String,
                                               style: MenuBarBlockStyle,
                                               pressure: MemoryPressure?,
-                                              warning: BatteryWarning) -> NSAttributedString {
+                                              warning: BatteryWarning,
+                                              highlights: [MenuBarThresholdHighlight]) -> NSAttributedString {
         let image = metricBlockImage(label: label,
                                      value: value,
                                      minimumValue: minimumValue,
                                      style: style,
                                      pressure: pressure,
-                                     warning: warning)
+                                     warning: warning,
+                                     highlights: highlights)
         let attachment = NSTextAttachment()
         attachment.image = image
         attachment.bounds = NSRect(x: 0,
@@ -882,7 +909,8 @@ enum MenuBarRenderer {
                                          minimumValue reservedValue: String,
                                          style: MenuBarBlockStyle,
                                          pressure: MemoryPressure?,
-                                         warning: BatteryWarning) -> NSImage {
+                                         warning: BatteryWarning,
+                                         highlights: [MenuBarThresholdHighlight]) -> NSImage {
         // Compact spacing hugs the value's digit count (with a stability
         // floor, see MenuBarSpacingSupport) instead of the metric's absolute
         // maximum; the reserve participates in the cache key, so both modes
@@ -891,7 +919,8 @@ enum MenuBarRenderer {
             ? MenuBarSpacingSupport.compactReserve(label: label, value: value)
             : reservedValue
         let pressureKey = pressure.map(String.init(describing:)) ?? "none"
-        let cacheKey = "metric|\(label)|\(value)|\(minimumValue)|\(style)|\(pressureKey)|\(warning)" as NSString
+        let highlightKey = highlights.map { "\($0.range.location):\($0.range.length):\($0.color.rawValue)" }.joined(separator: ",")
+        let cacheKey = "metric|\(label)|\(value)|\(minimumValue)|\(style)|\(pressureKey)|\(warning)|\(highlightKey)" as NSString
         if let cached = blockImageCache.object(forKey: cacheKey) { return cached }
 
         let labelFont = NSFont.systemFont(ofSize: style == .readable ? 7.2 : 6.6, weight: .medium)
@@ -928,8 +957,16 @@ enum MenuBarRenderer {
                 NSBezierPath(ovalIn: dotRect).fill()
                 valueX += dotDiameter + dotGap
             }
-            (value as NSString).draw(at: NSPoint(x: valueX, y: style == .readable ? -0.4 : -0.8),
-                                     withAttributes: valueAttrs)
+            let point = NSPoint(x: valueX, y: style == .readable ? -0.4 : -0.8)
+            if highlights.isEmpty {
+                (value as NSString).draw(at: point, withAttributes: valueAttrs)
+            } else {
+                let coloredValue = NSMutableAttributedString(string: value, attributes: valueAttrs)
+                for highlight in highlights {
+                    coloredValue.addAttribute(.foregroundColor, value: nsColor(for: highlight.color), range: highlight.range)
+                }
+                coloredValue.draw(at: point)
+            }
             return true
         }
         image.isTemplate = false
@@ -1163,6 +1200,10 @@ enum MenuBarRenderer {
         case .early: return .systemOrange
         case .none: return nil
         }
+    }
+
+    static func nsColor(for threshold: MenuBarThresholdHighlight.Color) -> NSColor {
+        threshold == .yellow ? .systemYellow : .systemRed
     }
 
     private static func estimatedSnapshot(fanCount: Int) -> SystemSnapshot {

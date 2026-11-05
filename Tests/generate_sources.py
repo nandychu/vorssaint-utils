@@ -950,6 +950,7 @@ def main():
               "    private func applyingCurrentVolumes(",
               "    private func savedCallAppVolumeEnabled(", "    func setCallAppVolumeControl(",
               "    private func appNeedsEngine(", "    private func rowMayBeTapped(",
+              "    func equalizerDidChange(",
               "    private func applyOutputRoute(", "    func setOutputDeviceUID(",
               "    func switchToNextSoundOutput(", "    func setUniversalOutputDeviceUID(",
               "    private func setDefaultOutputDeviceUID("])
@@ -1522,21 +1523,20 @@ def main():
           + "}\n")
     metric_view = "Sources/Vorssaint/UI/MenuPanel/MetricDetailView.swift"
     renderer = "Sources/Vorssaint/App/MenuBarRenderer.swift"
-    # Keep the battery branch and its real drawing path intact; unrelated
-    # monitor readings are outside this isolated warning-color contract.
-    battery_segments = declaration(renderer, "    private static func blockSegments(")
-    prefix, switch, cases = battery_segments.partition("            switch metric {\n")
+    # Keep the readings that use warning colors and their real drawing path.
+    color_segments = declaration(renderer, "    private static func blockSegments(")
+    prefix, switch, cases = color_segments.partition("            switch metric {\n")
+    _, cpu_case, rest = cases.partition("            case .cpu, .cpuTemperature:\n")
+    cpu_body, gpu_case, _ = rest.partition("            case .gpu, .gpuTemperature:\n")
     _, battery_case, rest = cases.partition("            case .battery, .batteryTemperature:\n")
     battery_body, next_case, _ = rest.partition("            case .batteryTime:\n")
-    if not switch or not battery_case or not next_case:
-        raise ValueError("Expected the battery branch in blockSegments")
-    for line in ["        let usesBars = appearance == .bars\n",
-                 "        var renderedCPU = false\n", "        var renderedGPU = false\n"]:
-        if line not in prefix:
-            raise ValueError("Expected the unrelated activity state in blockSegments")
-        prefix = prefix.replace(line, "")
-    battery_segments = (prefix + switch + battery_case + battery_body
-                        + "            }\n        }\n        return blockJoined(groups, style: style)\n    }\n#sourceLocation()\n")
+    _, fan_case, rest = cases.partition("            case .fanSpeed:\n")
+    fan_body, end, _ = rest.partition("            }\n        }\n        return blockJoined(groups, style: style)\n")
+    if not all([switch, cpu_case, gpu_case, battery_case, next_case, fan_case, end]):
+        raise ValueError("Expected the CPU, battery and fan branches in blockSegments")
+    prefix = prefix.replace("        var renderedGPU = false\n", "")
+    color_segments = (prefix + switch + cpu_case + cpu_body + battery_case + battery_body
+                      + fan_case + fan_body + end + "    }\n#sourceLocation()\n")
     battery_warning = declaration(renderer, "    private static func batteryWarning(")
     connection = "externalConnected: power?.externalConnected ?? false)"
     if connection not in battery_warning:
@@ -1551,14 +1551,19 @@ def main():
           + "".join(declaration(spacing, prefix).replace("UserDefaults.standard", "ReviewDefaults.current!")
                     for prefix in ["enum MenuBarMetricSpacing:", "enum MenuBarMetricAppearance:"])
           + "}\nextension MenuBarBatteryWarningTests.Renderer {\n"
-          + (battery_segments + battery_warning).replace("private static", "static")
+          + (color_segments + battery_warning).replace("private static", "static")
               .replace("UserDefaults.standard", "ReviewDefaults.current!")
           + "".join(declaration(renderer, prefix).replace("private static", "static")
-                    .replace("UserDefaults.standard", "ReviewDefaults.current!") for prefix in [
+                    .replace("UserDefaults.standard", "ReviewDefaults.current!")
+                    .replace("activeThresholds()", "activeThresholds(in: ReviewDefaults.current!)") for prefix in [
                         "    static func attributed(", "    private static func metricBlockAttachment(",
                         "    private static func metricBlockImage(", "    private static func batteryBlockAttachment(",
                         "    private static func batteryBlockImage(", "    private static func blockImageCost(",
                         "    private static func dynamicTextAttributes(", "    static func nsColor(for warning:",
+                        "    static func nsColor(for threshold:", "    private static func cpuTemperatureHighlights(",
+                        "    private static func fanSpeedValue(", "    private static var averagesFanSpeeds:",
+                        "    private static func percent(",
+                        "    private static func minimumCombinedValue(", "    private static func combinedComponentLabel(",
                         "    static func nsColor(for pressure:", "    private static func temperatureCompact(",
                         "    private static func temperatureLabel(", "    private static func combinedComponentValue("])
           + "}\n")

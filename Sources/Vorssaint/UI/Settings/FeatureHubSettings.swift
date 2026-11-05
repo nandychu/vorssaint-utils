@@ -1169,6 +1169,7 @@ extension AppFeature {
         case .diskImageInstaller:
             return FeatureStrings.diskImageInstaller(language).title
         case .mixer: return s.mixerSection
+        case .audioEqualizer: return FeatureStrings.audioEqualizer(language).title
         case .soundOutputSwitcher: return s.soundOutputSwitcherTitle
         case .audioPriority: return hub.titleAudioPriority
         case .micMute: return s.micMuteName
@@ -1209,6 +1210,7 @@ extension AppFeature {
         case .killProcess: return FeatureStrings.killProcess(language).pageTitle
         case .portManager: return FeatureStrings.portManager(language).title
         case .securityScan: return FeatureStrings.securityScan(language).title
+        case .cpuStress: return FeatureStrings.cpuStress(language).title
         case .homebrew: return s.homebrewName
         case .appUpdates: return FeatureStrings.appUpdates(language).pageTitle
         case .monitorCPU: return s.monitorShowCPU
@@ -1256,6 +1258,7 @@ extension AppFeature {
         case .diskImageInstaller:
             return FeatureStrings.diskImageInstaller(L10n.shared.language).hubDescription
         case .mixer: return hub.descMixer
+        case .audioEqualizer: return FeatureStrings.audioEqualizer(L10n.shared.language).description
         case .soundOutputSwitcher: return hub.descSoundOutputSwitcher
         case .audioPriority: return hub.descAudioPriority
         case .micMute: return hub.descMicMute
@@ -1302,6 +1305,7 @@ extension AppFeature {
         case .killProcess: return FeatureStrings.killProcess(L10n.shared.language).hubDescription
         case .portManager: return FeatureStrings.portManager(L10n.shared.language).hubDescription
         case .securityScan: return FeatureStrings.securityScan(L10n.shared.language).hubDescription
+        case .cpuStress: return FeatureStrings.cpuStress(L10n.shared.language).description
         case .homebrew: return hub.descHomebrew
         case .appUpdates: return FeatureStrings.appUpdates(L10n.shared.language).hubDescription
         case .monitorCPU: return hub.descMonitorCPU

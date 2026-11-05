@@ -24,6 +24,12 @@ struct MenuBarMetricsPreview: View {
     @AppStorage(DefaultsKey.menuBarPower) private var power = false
     @AppStorage(DefaultsKey.menuBarFanSpeed) private var fanSpeed = false
     @AppStorage(DefaultsKey.menuBarAverageFanSpeed) private var averageFanSpeed = false
+    @AppStorage(DefaultsKey.menuBarCPUTemperatureColors) private var cpuTemperatureColors = false
+    @AppStorage(DefaultsKey.menuBarCPUTemperatureYellow) private var cpuTemperatureYellow = MenuBarThresholdMetric.cpuTemperature.defaultYellow
+    @AppStorage(DefaultsKey.menuBarCPUTemperatureRed) private var cpuTemperatureRed = MenuBarThresholdMetric.cpuTemperature.defaultRed
+    @AppStorage(DefaultsKey.menuBarFanSpeedColors) private var fanSpeedColors = false
+    @AppStorage(DefaultsKey.menuBarFanSpeedYellow) private var fanSpeedYellow = MenuBarThresholdMetric.fanSpeed.defaultYellow
+    @AppStorage(DefaultsKey.menuBarFanSpeedRed) private var fanSpeedRed = MenuBarThresholdMetric.fanSpeed.defaultRed
     @AppStorage(DefaultsKey.menuBarConnectedDevices) private var connectedDevices = false
     @AppStorage(DefaultsKey.menuBarMetricOrder) private var metricOrder = ""
     @AppStorage(DefaultsKey.menuBarCombineTemperatures) private var combineTemperatures = true
@@ -55,6 +61,8 @@ struct MenuBarMetricsPreview: View {
         let _ = labelStyle
         let _ = networkUploadFirst
         let _ = averageFanSpeed
+        let _ = (cpuTemperatureColors, cpuTemperatureYellow, cpuTemperatureRed,
+                 fanSpeedColors, fanSpeedYellow, fanSpeedRed)
         let _ = memoryStyle
         let _ = diskStyle
         let _ = temperatureUnit
@@ -162,13 +170,14 @@ struct MenuBarMetricsPreview: View {
                 .font(.system(size: 13.6, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 14.2, height: 14.2)
-        case let .metricBlock(label, value, minimumValue, style, pressure, warning):
+        case let .metricBlock(label, value, minimumValue, style, pressure, warning, highlights):
             metricBlock(label: label,
                         value: value,
                         minimumValue: minimumValue,
                         style: style,
                         pressure: pressure,
-                        warning: warning)
+                        warning: warning,
+                        highlights: highlights)
         case let .usageBarBlock(label, fraction, style, pressure):
             usageBarBlock(label: label,
                           fraction: fraction,
@@ -236,7 +245,8 @@ struct MenuBarMetricsPreview: View {
                              minimumValue: String,
                              style: MenuBarBlockStyle,
                              pressure: MemoryPressure?,
-                             warning: BatteryWarning) -> some View {
+                             warning: BatteryWarning,
+                             highlights: [MenuBarThresholdHighlight]) -> some View {
         VStack(spacing: -1) {
             Text(label)
                 .font(.system(size: style == .readable ? 7.2 : 6.6, weight: .medium))
@@ -248,7 +258,7 @@ struct MenuBarMetricsPreview: View {
                                height: style == .readable ? 5.2 : 4.8)
                 }
                 if !value.isEmpty {
-                    Text(value)
+                    Text(highlightedValue(value, highlights: highlights))
                         .foregroundStyle(MenuBarRenderer.nsColor(for: warning).map { Color(nsColor: $0) } ?? .white)
                         .font(.system(size: style == .readable ? 13 : 12,
                                       weight: .semibold,
@@ -260,6 +270,16 @@ struct MenuBarMetricsPreview: View {
         }
         .foregroundStyle(.white)
         .fixedSize(horizontal: true, vertical: true)
+    }
+
+    private func highlightedValue(_ value: String, highlights: [MenuBarThresholdHighlight]) -> AttributedString {
+        var result = AttributedString(value)
+        for highlight in highlights {
+            if let range = Range(highlight.range, in: value), let attributedRange = Range(range, in: result) {
+                result[attributedRange].foregroundColor = Color(nsColor: MenuBarRenderer.nsColor(for: highlight.color))
+            }
+        }
+        return result
     }
 
     private func usageBarBlock(label: String,

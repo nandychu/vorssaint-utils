@@ -22,13 +22,13 @@ enum AppFeature: String, CaseIterable {
     case clipboardHistory, pastePlain, finderCutPaste, finderRename, shelf, urlCleaner,
          diskImageInstaller
     // Sound
-    case mixer, soundOutputSwitcher, audioPriority, micMute, musicBlock
+    case mixer, audioEqualizer, soundOutputSwitcher, audioPriority, micMute, musicBlock
     // Energy and display
     case keepAwake, brightness, extraBrightness, bluetoothSleep
     // Tools
     case quickLauncher, quickToggles, quitApps, colorPicker, screenOCR, cleaningMode, mediaTools,
          cleaner, uninstaller, homebrew, appUpdates, screenshot, cameraPreview, radialMenu, scratchpad,
-         commandBar, screenRecorder, wallpaper, killProcess, portManager, securityScan
+         commandBar, screenRecorder, wallpaper, killProcess, portManager, securityScan, cpuStress
     // Dynamic Island, then its extensions
     case notch, notchCalendar, notchNotifications, notchGestures, notchTimer, notchAccessories, notchLyrics,
          notchQueue, notchLiveEqualizer, notchDownloads, notchAgents, notchWatch, notchMascot
@@ -83,7 +83,7 @@ extension AppFeature {
         // Watch asks when an area is chosen and checks on every reading. The
         // companion uses no permission at all.
         case .screenOCR, .cleaningMode, .screenshot, .commandBar, .screenRecorder, .wallpaper, .notchWatch,
-             .notchMascot:
+             .notchMascot, .cpuStress:
             return false
         default:
             return true
@@ -109,13 +109,13 @@ extension AppFeature {
         case .clipboardHistory, .pastePlain, .finderCutPaste, .finderRename, .shelf, .urlCleaner,
              .diskImageInstaller:
             return .clipboardFiles
-        case .mixer, .soundOutputSwitcher, .audioPriority, .micMute, .musicBlock:
+        case .mixer, .audioEqualizer, .soundOutputSwitcher, .audioPriority, .micMute, .musicBlock:
             return .sound
         case .keepAwake, .brightness, .extraBrightness, .bluetoothSleep:
             return .energyDisplay
         case .quickLauncher, .quickToggles, .quitApps, .colorPicker, .screenOCR, .cleaningMode, .mediaTools,
              .cleaner, .uninstaller, .homebrew, .appUpdates, .screenshot, .cameraPreview, .radialMenu,
-             .scratchpad, .commandBar, .screenRecorder, .wallpaper, .killProcess, .portManager, .securityScan:
+             .scratchpad, .commandBar, .screenRecorder, .wallpaper, .killProcess, .portManager, .securityScan, .cpuStress:
             return .tools
         case .notch, .notchCalendar, .notchNotifications, .notchGestures, .notchTimer, .notchAccessories,
              .notchLyrics, .notchQueue, .notchLiveEqualizer, .notchDownloads, .notchAgents, .notchWatch,
@@ -162,6 +162,7 @@ extension AppFeature {
         case .urlCleaner: return "link"
         case .diskImageInstaller: return "externaldrive.badge.plus"
         case .mixer: return "speaker.wave.2"
+        case .audioEqualizer: return "slider.vertical.3"
         case .soundOutputSwitcher: return "hifispeaker"
         case .audioPriority: return "list.number"
         case .micMute: return "mic.slash"
@@ -204,6 +205,7 @@ extension AppFeature {
         case .killProcess: return "xmark.octagon"
         case .portManager: return "network"
         case .securityScan: return "shield.lefthalf.filled"
+        case .cpuStress: return "cpu"
         case .monitorCPU: return "cpu"
         case .monitorGPU: return "rectangle.connected.to.line.below"
         case .monitorMemory: return "memorychip"
@@ -235,6 +237,7 @@ extension AppFeature {
     /// the permissions portal.
     var enabledKeys: [String] {
         switch self {
+        case .audioEqualizer: return [DefaultsKey.audioEqualizerEnabled]
         case .switcher: return [DefaultsKey.switcherEnabled]
         case .dockPreview: return [DefaultsKey.dockPreviewEnabled]
         case .dockClick: return [DefaultsKey.dockClickMinimize,
@@ -292,7 +295,7 @@ extension AppFeature {
         case .windowLayout, .diskImageInstaller, .mixer, .micMute, .keepAwake,
              .quickLauncher, .quickToggles, .quitApps, .colorPicker, .screenOCR, .cleaningMode, .mediaTools,
              .cleaner, .uninstaller, .homebrew, .appUpdates, .screenshot, .cameraPreview, .scratchpad,
-             .commandBar, .screenRecorder, .wallpaper, .killProcess, .portManager, .securityScan,
+             .commandBar, .screenRecorder, .wallpaper, .killProcess, .portManager, .securityScan, .cpuStress,
              .monitorCPU, .monitorGPU, .monitorMemory, .monitorNetwork, .monitorDisk, .monitorPower,
              .connectedDevices, .fanControl:
             return []
@@ -308,7 +311,7 @@ extension AppFeature {
         switch self {
         case .windowLayout: return [DefaultsKey.windowLayoutShortcutsEnabled]
         case .audioPriority: return enabledKeys
-        case .notchLiveEqualizer: return []
+        case .notchLiveEqualizer, .audioEqualizer: return []
         default: return enabledKeys.first.map { [$0] } ?? []
         }
     }
@@ -383,13 +386,14 @@ extension AppFeature {
         case .appUpdates: return [.notifications, .appManagement]
         case .diskImageInstaller: return [.appManagement]
         case .mixer: return [.audioCapture, .accessibility]
+        case .audioEqualizer: return [.audioCapture]
         case .musicBlock: return [.accessibility]
         case .monitorCPU, .monitorMemory, .monitorDisk, .monitorPower: return [.notifications]
         case .clipboardHistory, .shelf, .urlCleaner,
              .soundOutputSwitcher, .audioPriority,
              .extraBrightness, .bluetoothSleep, .quickLauncher, .colorPicker, .micMute, .mediaTools,
              .scratchpad, .wallpaper, .monitorGPU, .monitorNetwork, .connectedDevices, .fanControl, .killProcess,
-             .portManager, .securityScan,
+             .portManager, .securityScan, .cpuStress,
              // Each app gets the ordinary quit request it would from its own menu.
              .quitApps:
             return []
@@ -490,7 +494,8 @@ extension AppFeature {
              .connectedDevices:
             return true
         case .focusFollowsMouse, .scrollHorizontal, .scrollZoom, .linearScroll, .diskImageInstaller, .audioPriority,
-             .wallpaper, .killProcess, .portManager, .securityScan, .fanControl, .notchMascot, .spacesOrder, .quitApps:
+             .wallpaper, .killProcess, .portManager, .securityScan, .cpuStress, .audioEqualizer, .fanControl,
+             .notchMascot, .spacesOrder, .quitApps:
             return false
         }
     }

@@ -31,6 +31,56 @@ enum MenuBarMetricAppearance: String, CaseIterable {
     }
 }
 
+enum MenuBarThresholdMetric {
+    case cpuTemperature, fanSpeed
+
+    var enabledKey: String {
+        self == .cpuTemperature ? DefaultsKey.menuBarCPUTemperatureColors : DefaultsKey.menuBarFanSpeedColors
+    }
+
+    var yellowKey: String {
+        self == .cpuTemperature ? DefaultsKey.menuBarCPUTemperatureYellow : DefaultsKey.menuBarFanSpeedYellow
+    }
+
+    var redKey: String {
+        self == .cpuTemperature ? DefaultsKey.menuBarCPUTemperatureRed : DefaultsKey.menuBarFanSpeedRed
+    }
+
+    var defaultYellow: Double { self == .cpuTemperature ? 80 : 3_500 }
+    var defaultRed: Double { self == .cpuTemperature ? 95 : 5_000 }
+    var limits: ClosedRange<Double> { self == .cpuTemperature ? 0...125 : 1...20_000 }
+    var minimumGap: Double { self == .cpuTemperature ? 0.1 : 1 }
+
+    func thresholds(yellow: Double, red: Double) -> MenuBarReadingThresholds {
+        let yellow = min(limits.upperBound - minimumGap, max(limits.lowerBound, yellow.isFinite ? yellow : defaultYellow))
+        let red = min(limits.upperBound, max(yellow + minimumGap, red.isFinite ? red : defaultRed))
+        return MenuBarReadingThresholds(yellow: yellow, red: red)
+    }
+
+    func activeThresholds(in defaults: UserDefaults = .standard) -> MenuBarReadingThresholds? {
+        guard defaults.bool(forKey: enabledKey) else { return nil }
+        return thresholds(yellow: (defaults.object(forKey: yellowKey) as? NSNumber)?.doubleValue ?? defaultYellow,
+                          red: (defaults.object(forKey: redKey) as? NSNumber)?.doubleValue ?? defaultRed)
+    }
+}
+
+struct MenuBarReadingThresholds {
+    let yellow: Double
+    let red: Double
+
+    func highlight(for reading: Double, range: NSRange) -> MenuBarThresholdHighlight? {
+        guard reading.isFinite, reading >= yellow else { return nil }
+        return MenuBarThresholdHighlight(range: range, color: reading >= red ? .red : .yellow)
+    }
+}
+
+struct MenuBarThresholdHighlight: Equatable {
+    enum Color: String { case yellow, red }
+
+    let range: NSRange
+    let color: Color
+}
+
 enum MenuBarUsageBarSupport {
     static let defaultNormalColor = "#64D2FF"
     static let defaultElevatedColor = "#FFD60A"

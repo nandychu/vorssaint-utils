@@ -189,6 +189,7 @@ enum MixerTapConfigurationTests {
         changes(suite, format: format)
         fallbackOutputFormat(suite, format: format)
         notificationDuringRead(suite, format: format)
+        throttledRefreshDuringRead(suite, format: format)
         for status in [noErr, kAudioHardwareBadObjectError, kAudioHardwareUnspecifiedError] {
             removal(suite, format: format, status: status)
         }
@@ -380,6 +381,33 @@ enum MixerTapConfigurationTests {
         watch.queue.run()
         suite.expect(!watch.canRender && watch.requiresRebuild && counter.value == 1,
                      "the subsequent read invalidates the new sample rate exactly once")
+    }
+
+    private static func throttledRefreshDuringRead(_ suite: TestSuite, format: MixerTapFormat) {
+        for startup in [true, false] {
+            HAL.reset()
+            let counter = Counter()
+            let watch = makeWatch(format: format, counter: counter)
+            watch.start()
+            if !startup {
+                watch.queue.run()
+                HAL.announce(tap, kAudioTapPropertyFormat)
+            }
+            HAL.duringRead = { key in
+                guard key.object == tap else { return }
+                HAL.duringRead = nil
+                // Engine reconciliation asks for a routine read while the
+                // initial/notification-driven validation is still running.
+                watch.refresh(immediately: false)
+            }
+            watch.queue.runNext()
+            suite.expect(!watch.canRender && !watch.requiresRebuild && watch.queue.count == 1,
+                         "a routine refresh during format validation owns the trailing pass (startup: \(startup))")
+            watch.queue.run()
+            suite.expect(watch.canRender && !watch.requiresRebuild && counter.value == 0,
+                         "a throttled trailing refresh cannot leave valid audio permanently suspended (startup: \(startup))")
+            finish(watch, suite)
+        }
     }
 
     private static func fallbackOutputFormat(_ suite: TestSuite, format: MixerTapFormat) {
